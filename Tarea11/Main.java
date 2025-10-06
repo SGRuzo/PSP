@@ -17,6 +17,8 @@ class Domino extends Thread {
             siguiente = new Domino("Ficha " + (numero + 1), numero + 1);
             siguiente.start();
         }
+
+
         for (int i = 1; i <= 5; i++) {
             System.out.println("[" + nombre + "] iteración: " + i);
             try {
