@@ -25,7 +25,7 @@ public class Main {
         String urlMasRapida= resultado1.tiempoMs<resultado2.tiempoMs ? url1:url2;
         long tiempoMasRapido= Math.min(resultado1.tiempoMs, resultado2.tiempoMs);
 
-        // Comparar numero caracteres)
+        // Comparar numero caracteres
         String urlMasContenido= resultado1.tamañoCaracteres>resultado2.tamañoCaracteres ? url1:url2;
         int tamañoMasContenido= Math.max(resultado1.tamañoCaracteres, resultado2.tamañoCaracteres);
 

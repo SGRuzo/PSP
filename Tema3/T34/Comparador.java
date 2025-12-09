@@ -45,6 +45,7 @@ public class Comparador {
 
         } catch (Exception e) {
             System.err.println("Error con la URL: "+url);
+
             e.printStackTrace();
             return null;
         }
