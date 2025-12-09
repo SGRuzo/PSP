@@ -9,38 +9,42 @@ import java.time.Duration;
 
 public class Comparador {
 
-    public static class ResultadoWeb {
+    public static class Resultado {
         long tiempoMs;
         int tamañoCaracteres;
 
-        ResultadoWeb(long tiempoMs, int tamañoCaracteres) {
+        Resultado(long tiempoMs, int tamañoCaracteres) {
             this.tiempoMs =tiempoMs;
             this.tamañoCaracteres =tamañoCaracteres;
         }
     }
 
-    public static ResultadoWeb obtenerDatosWeb(String url) {
+    public static Resultado obtenerDatos(String url) {
         try {
+            // Crear cliente HTTP
             HttpClient cliente=HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(10)).build();
 
+            //contenido
             HttpRequest request=HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .GET()
                     .timeout(Duration.ofSeconds(10))
                     .build();
 
+            // Medir tiempo de respuesta
             long inicio=System.currentTimeMillis();
             HttpResponse<String> response= cliente.send(request, HttpResponse.BodyHandlers.ofString());
             long fin = System.currentTimeMillis();
 
+            // Calcular resultados
             long tiempoMs =fin-inicio;
             int tamañoCaracteres = response.body().length();
 
-            return new ResultadoWeb(tiempoMs, tamañoCaracteres);
+            return new Resultado(tiempoMs, tamañoCaracteres);
 
         } catch (Exception e) {
-            System.err.println("Error al procesar la URL: "+url);
+            System.err.println("Error con la URL: "+url);
             e.printStackTrace();
             return null;
         }
