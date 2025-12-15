@@ -48,17 +48,13 @@ public class Consulta{
             throw new IOException("Error HTTP: "+response.statusCode());
         }
         ObjectMapper mapper=new ObjectMapper();
-        Respuesta respuestaAPI=
-                mapper.readValue(response.body(),Respuesta.class);
+        Respuesta respuestaAPI= mapper.readValue(response.body(),Respuesta.class);
         String busquedaLower=busqueda.toLowerCase();
 
         return respuestaAPI.getData().stream()
-                .filter(m->
-                        m.getNombre().toLowerCase().equals(busquedaLower)||
-                                m.getSimbolo().toLowerCase().equals(busquedaLower))
+                .filter(m->m.getNombre().toLowerCase().equals(busquedaLower)||m.getSimbolo().toLowerCase().equals(busquedaLower))
                 .findFirst()
-                .orElseThrow(()->
-                        new IllegalArgumentException("Moneda no encontrada."));
+                .orElseThrow(()->new IllegalArgumentException("Moneda no encontrada."));
     }
 
     private static void mostrarInformacion(CriptoMoneda moneda){
@@ -70,10 +66,6 @@ public class Consulta{
         double cambio=moneda.getCambio24h();
         String color=cambio<0?ROJO:AZUL;
         String signo=cambio>=0?"+":"";
-
-        System.out.printf(
-                "Variación 24h: %s%s%.2f%%%s%n",
-                color,signo,cambio
-        );
+        System.out.printf("Variación 24h: %s%s%.2f%%%s%n",color,signo,cambio);
     }
 }
