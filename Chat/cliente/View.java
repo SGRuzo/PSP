@@ -16,17 +16,39 @@ public class View extends JFrame {
     private JPanel areaChatPanel;
     private JTextField campoEntrada;
     private JButton btnEnviar, btnConectar, btnDesconectar, btnComandoList, btnComandoPing, btnLimpiar;
-    private JButton btnToggleMenu;
+    private JButton btnToggleMenu, btnToggleFeedback;
 
     // Paneles y etiquetas
     private JLabel lblEstado, lblUsuario, lblConectados;
     private JPanel panelEntrada, panelBotones, panelInfo, panelChat, panelMenu;
-    private JPanel panelIzquierdo;
-    private JPanel panelBotonMenu; // Panel flotante para el botón
+    private JPanel panelIzquierdo, panelDerecho;
+    private JPanel panelBotonMenu, panelBotonFeedback; // Paneles flotantes para botones
+    private JPanel areaFeedbackPanel; // Panel para mostrar mensajes de feedback
+    private JPanel panelPrincipal; // Panel principal para cambio de tema
+    private JButton btnSol; // Botón para cambiar tema
     private boolean menuVisible = false;
+    private boolean feedbackVisible = false;
+    private boolean isDarkMode = false; // Estado del tema
     private Timer animacionTimer;
     private int anchoMenu = 140;
+    private int anchoFeedback = 280;
     private int anchoActual = 0;
+    private int anchoFeedbackActual = 0;
+
+    // Paleta de Colores para Modo Oscuro
+    private final Color DARK_BG = new Color(24, 24, 24);          // Fondo principal (menos puro)
+    private final Color DARK_ACCENT = new Color(33, 33, 33);      // Paneles secundarios
+    private final Color DARK_CHAT_BG = new Color(18, 18, 18);     // Área de chat (más profunda)
+    private final Color DARK_TEXT = new Color(225, 225, 225);     // Texto principal
+    private final Color DARK_TEXT_MUTED = new Color(150, 150, 150); // Texto secundario
+    private final Color DARK_BORDER = new Color(45, 45, 45);      // Bordes sutiles
+    private final Color DARK_BLUE_BUBBLE = new Color(10, 100, 200); // Azul más suave para el ojo
+
+    // Paleta de Colores para Modo Claro
+    private final Color LIGHT_BG = Color.WHITE;
+    private final Color LIGHT_ACCENT = new Color(245, 245, 245);
+    private final Color LIGHT_TEXT = Color.BLACK;
+    private final Color LIGHT_BORDER = Color.LIGHT_GRAY;
 
     public View() {
         inicializarVentana();
@@ -44,7 +66,7 @@ public class View extends JFrame {
     }
 
     private void crearComponentes() {
-        JPanel panelPrincipal = new JPanel(new BorderLayout(0, 10));
+        panelPrincipal = new JPanel(new BorderLayout(0, 10));
         panelPrincipal.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         panelPrincipal.setBackground(Color.WHITE);
 
@@ -155,13 +177,16 @@ public class View extends JFrame {
         lblTitulo.setForeground(new Color(200, 200, 200));
 
         // Botón de Sol (Tema Claro)
-        JButton btnSol = new JButton(createSunIcon(Color.ORANGE));
+        btnSol = new JButton(createSunIcon(Color.ORANGE));
         btnSol.setPreferredSize(new Dimension(25, 25));
         btnSol.setContentAreaFilled(false);
         btnSol.setBorderPainted(false);
         btnSol.setFocusPainted(false);
         btnSol.setCursor(new Cursor(Cursor.HAND_CURSOR));
         btnSol.setToolTipText("Cambiar a Tema Claro");
+
+        // Añadir acción para cambiar tema
+        btnSol.addActionListener(e -> toggleTheme());
 
         // Añadir al panel de cabecera
         panelCabeceraMenu.add(lblTitulo, BorderLayout.WEST);
@@ -241,6 +266,70 @@ public class View extends JFrame {
         panelBotonMenu.setBackground(new Color(255, 255, 255, 0)); // Transparente
         panelBotonMenu.add(btnToggleMenu);
 
+        // ========== PANEL DERECHO (FEEDBACK) ==========
+        panelDerecho = new JPanel(new BorderLayout());
+        panelDerecho.setBackground(new Color(240, 240, 240));
+        panelDerecho.setBorder(BorderFactory.createMatteBorder(0, 2, 0, 0, new Color(200, 200, 200)));
+
+        // --- CABECERA DEL PANEL DE FEEDBACK ---
+        JPanel panelCabeceraFeedback = new JPanel(new BorderLayout());
+        panelCabeceraFeedback.setOpaque(false);
+        panelCabeceraFeedback.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+        panelCabeceraFeedback.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 10));
+
+        JLabel lblFeedback = new JLabel("FEEDBACK");
+        lblFeedback.setFont(new Font("Arial", Font.BOLD, 12));
+        lblFeedback.setForeground(new Color(50, 50, 50));
+
+        // Botón de Ocultar/Mostrar Feedback
+        btnToggleFeedback = new JButton("◀");
+        btnToggleFeedback.setPreferredSize(new Dimension(25, 25));
+        btnToggleFeedback.setFont(new Font("Arial", Font.BOLD, 16));
+        btnToggleFeedback.setBackground(new Color(70, 130, 180));
+        btnToggleFeedback.setForeground(Color.WHITE);
+        btnToggleFeedback.setFocusPainted(false);
+        btnToggleFeedback.setBorderPainted(false);
+        btnToggleFeedback.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btnToggleFeedback.setToolTipText("Mostrar feedback");
+        btnToggleFeedback.setBorder(BorderFactory.createEmptyBorder());
+
+        // Efecto hover
+        btnToggleFeedback.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                btnToggleFeedback.setBackground(new Color(90, 150, 200));
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                btnToggleFeedback.setBackground(new Color(70, 130, 180));
+            }
+        });
+
+        btnToggleFeedback.addActionListener(e -> toggleFeedback());
+
+        // Añadir al panel de cabecera
+        panelCabeceraFeedback.add(lblFeedback, BorderLayout.WEST);
+        panelCabeceraFeedback.add(btnToggleFeedback, BorderLayout.EAST);
+
+        // --- ÁREA DE MENSAJES DE FEEDBACK ---
+        areaFeedbackPanel = new JPanel();
+        areaFeedbackPanel.setLayout(new BoxLayout(areaFeedbackPanel, BoxLayout.Y_AXIS));
+        areaFeedbackPanel.setBackground(new Color(255, 255, 255)); // Blanco
+        areaFeedbackPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        areaFeedbackPanel.add(Box.createVerticalGlue());
+
+        // Scroll para el área de feedback
+        JScrollPane scrollFeedback = new JScrollPane(areaFeedbackPanel);
+        scrollFeedback.setBackground(new Color(255, 255, 255));
+        scrollFeedback.getViewport().setBackground(new Color(255, 255, 255));
+        scrollFeedback.setBorder(BorderFactory.createEmptyBorder());
+
+        panelDerecho.add(panelCabeceraFeedback, BorderLayout.NORTH);
+        panelDerecho.add(scrollFeedback, BorderLayout.CENTER);
+        panelDerecho.setPreferredSize(new Dimension(0, 0));
+        panelDerecho.setVisible(true); // Visible pero con ancho 0
+
         // ========== ENSAMBLAJE FINAL ==========
         JPanel panelContenido = new JPanel(new BorderLayout(0, 0));
         panelContenido.setBackground(Color.WHITE);
@@ -268,6 +357,7 @@ public class View extends JFrame {
         JPanel panelConMenu = new JPanel(new BorderLayout(0, 0));
         panelConMenu.add(panelIzquierdo, BorderLayout.WEST);
         panelConMenu.add(panelContenido, BorderLayout.CENTER);
+        panelConMenu.add(panelDerecho, BorderLayout.EAST);
 
         panelPrincipal.add(panelConMenu, BorderLayout.CENTER);
 
@@ -279,17 +369,56 @@ public class View extends JFrame {
             }
         });
 
-        // Crear un Glass Pane para el botón flotante
+        // Crear un Glass Pane para los botones flotantes
         JPanel glassPane = new JPanel(null);
         glassPane.setOpaque(false);
         glassPane.add(btnToggleMenu);
+
+        // Agregar botón flotante para feedback
+        JButton btnToggleFeedbackFlotante = new JButton("◀");
+        btnToggleFeedbackFlotante.setPreferredSize(new Dimension(30, 30));
+        btnToggleFeedbackFlotante.setFont(new Font("Arial", Font.BOLD, 16));
+        btnToggleFeedbackFlotante.setBackground(new Color(70, 130, 180));
+        btnToggleFeedbackFlotante.setForeground(Color.WHITE);
+        btnToggleFeedbackFlotante.setFocusPainted(false);
+        btnToggleFeedbackFlotante.setBorderPainted(false);
+        btnToggleFeedbackFlotante.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btnToggleFeedbackFlotante.setToolTipText("Mostrar feedback");
+        btnToggleFeedbackFlotante.setBorder(BorderFactory.createEmptyBorder());
+
+        // Efecto hover para botón flotante feedback
+        btnToggleFeedbackFlotante.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                btnToggleFeedbackFlotante.setBackground(new Color(90, 150, 200));
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                btnToggleFeedbackFlotante.setBackground(new Color(70, 130, 180));
+            }
+        });
+
+        btnToggleFeedbackFlotante.addActionListener(e -> {
+            toggleFeedback();
+            // Actualizar el texto del botón flotante
+            if (feedbackVisible) {
+                btnToggleFeedbackFlotante.setText("▶");
+                btnToggleFeedbackFlotante.setToolTipText("Ocultar feedback");
+            } else {
+                btnToggleFeedbackFlotante.setText("◀");
+                btnToggleFeedbackFlotante.setToolTipText("Mostrar feedback");
+            }
+        });
+
+        glassPane.add(btnToggleFeedbackFlotante);
         setGlassPane(glassPane);
         getGlassPane().setVisible(true);
 
         setContentPane(panelPrincipal);
 
-        // Posicionar el botón después de que todo esté listo
-        SwingUtilities.invokeLater(this::posicionarBotonFlotante);
+        // Posicionar ambos botones después de que todo esté listo
+        SwingUtilities.invokeLater(() -> posicionarBotonesFlotantes(btnToggleFeedbackFlotante));
     }
 
     private void posicionarBotonFlotante() {
@@ -297,6 +426,17 @@ public class View extends JFrame {
         int x = anchoActual + margen;
         int y = 15;
         btnToggleMenu.setBounds(x, y, 45, 45);
+    }
+
+    private void posicionarBotonesFlotantes(JButton btnToggleFeedbackFlotante) {
+        int margen = 15;
+        int x = anchoActual + margen;
+        int y = 15;
+        btnToggleMenu.setBounds(x, y, 45, 45);
+
+        // Posicionar botón de feedback en esquina superior derecha
+        int xDerecha = getWidth() - anchoFeedbackActual - 60;
+        btnToggleFeedbackFlotante.setBounds(xDerecha, y, 45, 45);
     }
 
     private void toggleMenu() {
@@ -330,6 +470,44 @@ public class View extends JFrame {
                     } else {
                         btnToggleMenu.setText("☰");
                         btnToggleMenu.setToolTipText("Mostrar menú");
+                    }
+                }
+            }
+        });
+
+        animacionTimer.start();
+    }
+
+    private void toggleFeedback() {
+        feedbackVisible = !feedbackVisible;
+
+        if (animacionTimer != null && animacionTimer.isRunning()) {
+            animacionTimer.stop();
+        }
+
+        int destino = feedbackVisible ? anchoFeedback : 0;
+        int paso = 20;
+
+        animacionTimer = new Timer(15, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (feedbackVisible) {
+                    anchoFeedbackActual = Math.min(anchoFeedbackActual + paso, destino);
+                } else {
+                    anchoFeedbackActual = Math.max(anchoFeedbackActual - paso, destino);
+                }
+
+                panelDerecho.setPreferredSize(new Dimension(anchoFeedbackActual, 0));
+                panelDerecho.revalidate();
+
+                if (anchoFeedbackActual == destino) {
+                    animacionTimer.stop();
+                    if (feedbackVisible) {
+                        btnToggleFeedback.setText("▶");
+                        btnToggleFeedback.setToolTipText("Ocultar feedback");
+                    } else {
+                        btnToggleFeedback.setText("◀");
+                        btnToggleFeedback.setToolTipText("Mostrar feedback");
                     }
                 }
             }
@@ -387,8 +565,375 @@ public class View extends JFrame {
      */
     private void limpiarChat() {
         areaChatPanel.removeAll();
+        areaChatPanel.add(Box.createVerticalGlue());
         areaChatPanel.revalidate();
         areaChatPanel.repaint();
+    }
+
+    /**
+     * Alterna entre tema claro y oscuro
+     */
+    private void toggleTheme() {
+        isDarkMode = !isDarkMode;
+        if (isDarkMode) {
+            applyDarkTheme();
+        } else {
+            applyLightTheme();
+        }
+    }
+
+    /**
+     * Aplica el tema claro a toda la aplicación
+     */
+    private void applyLightTheme() {
+        Color bgPrimary = LIGHT_BG;
+        Color bgSecondary = LIGHT_ACCENT;
+
+        // 1. Paneles Principales
+        panelPrincipal.setBackground(bgPrimary);
+        panelChat.setBackground(bgPrimary);
+        panelInfo.setBackground(bgPrimary);
+        panelEntrada.setBackground(bgPrimary);
+        panelBotones.setBackground(bgPrimary);
+
+        // 2. Paneles Laterales (Menu y Feedback)
+        panelIzquierdo.setBackground(new Color(45, 45, 48)); // El menú se mantiene oscuro por diseño
+        panelDerecho.setBackground(bgSecondary);
+        panelDerecho.setBorder(BorderFactory.createMatteBorder(0, 2, 0, 0, LIGHT_BORDER));
+        areaFeedbackPanel.setBackground(Color.WHITE);
+
+        // 3. Área de Chat y Scroll
+        areaChatPanel.setBackground(bgSecondary);
+        JScrollPane scrollChat = (JScrollPane) areaChatPanel.getParent().getParent();
+        if (scrollChat != null) {
+            scrollChat.getViewport().setBackground(bgSecondary);
+            scrollChat.getVerticalScrollBar().setBackground(bgPrimary);
+            scrollChat.getHorizontalScrollBar().setBackground(bgPrimary);
+        }
+
+        // 4. Componentes de Entrada
+        campoEntrada.setBackground(Color.WHITE);
+        campoEntrada.setForeground(LIGHT_TEXT);
+        campoEntrada.setCaretColor(LIGHT_TEXT);
+        campoEntrada.setBorder(BorderFactory.createLineBorder(LIGHT_BORDER));
+
+        // 5. Etiquetas
+        lblEstado.setForeground(Color.RED);
+        lblUsuario.setForeground(LIGHT_TEXT);
+        lblConectados.setForeground(LIGHT_TEXT);
+
+        // Cambiar icono a sol (tema claro)
+        btnSol.setIcon(createSunIcon(Color.ORANGE));
+        btnSol.setToolTipText("Cambiar a Tema Oscuro");
+
+        // Refrescar toda la interfaz
+        refreshUI();
+    }
+
+    /**
+     * Aplica el tema oscuro a toda la aplicación con soporte para bocadillos dinámicos
+     */
+    private void applyDarkTheme() {
+        // 1. Paneles Principales y Contenedores
+        panelPrincipal.setBackground(DARK_BG);
+        panelChat.setBackground(DARK_CHAT_BG);
+        panelInfo.setBackground(DARK_BG);
+        panelEntrada.setBackground(DARK_BG);
+        panelBotones.setBackground(DARK_BG);
+
+        // IMPORTANTE: Actualizar el fondo del panel que contiene los mensajes
+        areaChatPanel.setBackground(DARK_CHAT_BG);
+
+        // 2. Paneles Laterales
+        panelIzquierdo.setBackground(DARK_ACCENT);
+        panelMenu.setBackground(DARK_ACCENT);
+        panelDerecho.setBackground(DARK_ACCENT);
+        panelDerecho.setBorder(BorderFactory.createMatteBorder(0, 1, 0, 0, DARK_BORDER));
+        areaFeedbackPanel.setBackground(DARK_ACCENT);
+
+        // 3. ScrollBars - CRÍTICO para evitar parches blancos
+        JScrollPane scrollChat = (JScrollPane) areaChatPanel.getParent().getParent();
+        if (scrollChat != null) {
+            scrollChat.setBackground(DARK_CHAT_BG);
+            scrollChat.getViewport().setBackground(DARK_CHAT_BG);
+            scrollChat.setBorder(null);
+            scrollChat.getVerticalScrollBar().setBackground(DARK_ACCENT);
+            scrollChat.getHorizontalScrollBar().setBackground(DARK_ACCENT);
+        }
+
+        // 4. Componentes de Entrada
+        campoEntrada.setBackground(new Color(45, 45, 45));
+        campoEntrada.setForeground(DARK_TEXT);
+        campoEntrada.setCaretColor(Color.WHITE);
+        campoEntrada.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(DARK_BORDER),
+            BorderFactory.createEmptyBorder(8, 10, 8, 10)
+        ));
+
+        // 5. Etiquetas de estado
+        lblEstado.setForeground(new Color(129, 199, 132)); // Verde pastel
+        lblUsuario.setForeground(DARK_TEXT);
+        lblConectados.setForeground(DARK_TEXT_MUTED);
+
+        // CRÍTICO: Asegurar que las etiquetas no tengan fondos opacos
+        lblEstado.setOpaque(false);
+        lblUsuario.setOpaque(false);
+        lblConectados.setOpaque(false);
+
+        // 6. Actualizar todos los paneles hijos recursivamente para modo oscuro
+        updateComponentsInDarkTheme(this);
+
+        // 7. Actualizar Bocadillos y sus Contenedores - CRÍTICO para consistencia
+        for (Component c : areaChatPanel.getComponents()) {
+            if (c instanceof JPanel) {
+                c.setBackground(DARK_CHAT_BG); // Quita el fondo blanco del contenedor del mensaje
+                for (Component sub : ((JPanel) c).getComponents()) {
+                    if (sub instanceof BocadilloChat) {
+                        ((BocadilloChat) sub).actualizarTema(true);
+                    }
+                }
+            }
+        }
+
+        // 8. Actualizar Icono del botón de tema
+        btnSol.setIcon(createMoonIcon(new Color(241, 196, 15)));
+        btnSol.setToolTipText("Cambiar a Tema Claro");
+
+        // 9. Refrescar toda la interfaz
+        refreshUI();
+    }
+
+    /**
+     * Actualiza recursivamente todos los componentes para modo oscuro
+     */
+    private void updateComponentsInDarkTheme(Component component) {
+        if (component instanceof JPanel) {
+            JPanel panel = (JPanel) component;
+            // No cambiar panelMenu (que es oscuro por diseño)
+            if (panel != panelMenu && panel != panelIzquierdo && panel != panelDerecho) {
+                // Verificar si el panel tiene un fondo blanco o gris claro
+                if (panel.isOpaque() && (panel.getBackground().equals(Color.WHITE) ||
+                    panel.getBackground().equals(new Color(245, 245, 245)) ||
+                    panel.getBackground().equals(new Color(240, 240, 240)))) {
+                    panel.setBackground(DARK_BG);
+                }
+            }
+
+            // Recurrir en los componentes hijos
+            for (Component child : panel.getComponents()) {
+                updateComponentsInDarkTheme(child);
+            }
+        } else if (component instanceof JLabel) {
+            JLabel label = (JLabel) component;
+            label.setOpaque(false); // Las etiquetas no deben ser opacas
+        }
+    }
+
+    /**
+     * Actualiza y redibuja toda la interfaz de usuario
+     * Asegura que todos los componentes hijos se adapten al nuevo esquema de color
+     */
+    private void refreshUI() {
+        SwingUtilities.updateComponentTreeUI(this);
+        panelPrincipal.revalidate();
+        panelPrincipal.repaint();
+    }
+
+    /**
+     * Genera un icono de luna mediante dibujo vectorial (Graphics2D)
+     */
+    private Icon createMoonIcon(Color color) {
+        return new Icon() {
+            @Override
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                g2d.setColor(color);
+
+                // Dibujar luna creciente
+                Ellipse2D moon = new Ellipse2D.Double(x + 4, y + 2, 16, 20);
+                Ellipse2D shadow = new Ellipse2D.Double(x + 8, y + 2, 16, 20);
+
+                Area moonArea = new Area(moon);
+                moonArea.subtract(new Area(shadow));
+
+                g2d.fill(moonArea);
+
+                g2d.dispose();
+            }
+
+            @Override
+            public int getIconWidth() {
+                return 20;
+            }
+
+            @Override
+            public int getIconHeight() {
+                return 20;
+            }
+        };
+    }
+
+    /**
+     * Genera un icono de sol mediante dibujo vectorial (Graphics2D)
+     */
+    private Icon createSunIcon(Color color) {
+        return new Icon() {
+            @Override
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                int size = 20;
+                int cx = x + size / 2;
+                int cy = y + size / 2;
+                int radius = 5;
+
+                g2d.setColor(color);
+                g2d.setStroke(new BasicStroke(2, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+
+                // Rayos
+                for (int i = 0; i < 8; i++) {
+                    double angle = Math.PI * 2 * i / 8;
+                    int x1 = cx + (int) (Math.cos(angle) * (radius + 2));
+                    int y1 = cy + (int) (Math.sin(angle) * (radius + 2));
+                    int x2 = cx + (int) (Math.cos(angle) * (radius + 5));
+                    int y2 = cy + (int) (Math.sin(angle) * (radius + 5));
+                    g2d.drawLine(x1, y1, x2, y2);
+                }
+                // Centro
+                g2d.fillOval(cx - radius, cy - radius, radius * 2, radius * 2);
+                g2d.dispose();
+            }
+
+            @Override
+            public int getIconWidth() {
+                return 20;
+            }
+
+            @Override
+            public int getIconHeight() {
+                return 20;
+            }
+        };
+    }
+
+    // --- GETTERS DE BOTONES ---
+    public JButton obtenerBtnEnviar() { return btnEnviar; }
+    public JButton obtenerBtnConectar() { return btnConectar; }
+    public JButton obtenerBtnDesconectar() { return btnDesconectar; }
+    public JButton obtenerBtnList() { return btnComandoList; }
+    public JButton obtenerBtnPing() { return btnComandoPing; }
+    public JTextField obtenerCampoEntrada() { return campoEntrada; }
+
+    /**
+     * Solicita datos del servidor al usuario
+     * @return Array con [host, puerto] o null si se cancela
+     */
+    public String[] solicitarDatosServidor() {
+        JPanel panel = new JPanel(new GridLayout(2, 2, 5, 5));
+        JTextField fieldHost = new JTextField("localhost", 15);
+        JTextField fieldPuerto = new JTextField("5000", 15);
+        panel.add(new JLabel("Host:"));
+        panel.add(fieldHost);
+        panel.add(new JLabel("Puerto:"));
+        panel.add(fieldPuerto);
+        int resultado = JOptionPane.showConfirmDialog(this, panel, "Datos del Servidor", JOptionPane.OK_CANCEL_OPTION);
+        if (resultado == JOptionPane.OK_OPTION) {
+            return new String[]{fieldHost.getText(), fieldPuerto.getText()};
+        }
+        return null;
+    }
+
+    /**
+     * Solicita el nombre de usuario
+     * @return El nombre de usuario ingresado
+     */
+    public String solicitarNombreUsuario() {
+        return JOptionPane.showInputDialog(this, "Ingrese su nombre de usuario:", "");
+    }
+
+    /**
+     * Muestra un diálogo de error
+     * @param titulo Título del diálogo
+     * @param mensaje Mensaje de error
+     */
+    public void mostrarError(String titulo, String mensaje) {
+        JOptionPane.showMessageDialog(this, mensaje, titulo, JOptionPane.ERROR_MESSAGE);
+    }
+
+    /**
+     * Establece el estado de conexión
+     * @param conectado true si conectado, false si desconectado
+     */
+    public void establecerEstado(boolean conectado) {
+        if (conectado) {
+            lblEstado.setText("Estado: Conectado");
+            lblEstado.setForeground(new Color(39, 174, 96));
+            campoEntrada.setEnabled(true);
+            btnEnviar.setEnabled(true);
+            btnConectar.setEnabled(false);
+            btnDesconectar.setEnabled(true);
+            btnComandoList.setEnabled(true);
+            btnComandoPing.setEnabled(true);
+        } else {
+            lblEstado.setText("Estado: Desconectado");
+            lblEstado.setForeground(Color.RED);
+            campoEntrada.setEnabled(false);
+            btnEnviar.setEnabled(false);
+            btnConectar.setEnabled(true);
+            btnDesconectar.setEnabled(false);
+            btnComandoList.setEnabled(false);
+            btnComandoPing.setEnabled(false);
+        }
+    }
+
+    /**
+     * Establece el nombre del usuario conectado
+     * @param usuario Nombre del usuario
+     */
+    public void establecerUsuario(String usuario) {
+        lblUsuario.setText("Usuario: " + usuario);
+    }
+
+    /**
+     * Obtiene el texto ingresado en el campo de entrada
+     * @return El texto del campo
+     */
+    public String obtenerTextoEntrada() {
+        return campoEntrada.getText();
+    }
+
+    /**
+     * Limpia el campo de entrada
+     */
+    public void limpiarEntrada() {
+        campoEntrada.setText("");
+    }
+
+    /**
+     * Muestra un mensaje de sistema en el chat
+     * @param mensaje El mensaje a mostrar
+     */
+    public void mostrarMensajeSistema(String mensaje) {
+        // Crear panel contenedor centrado
+        JPanel panelCentrado = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        panelCentrado.setBackground(new Color(245, 245, 245));
+        panelCentrado.setMaximumSize(new Dimension(Integer.MAX_VALUE, 55));
+
+        panelCentrado.add(new MensajeSistemaPanel(mensaje));
+
+        areaChatPanel.add(panelCentrado);
+        areaChatPanel.add(Box.createVerticalStrut(10));
+        areaChatPanel.revalidate();
+        areaChatPanel.repaint();
+
+        // Scroll al final
+        SwingUtilities.invokeLater(() -> {
+            JScrollPane scrollPane = (JScrollPane) areaChatPanel.getParent().getParent();
+            scrollPane.getVerticalScrollBar().setValue(scrollPane.getVerticalScrollBar().getMaximum());
+        });
     }
 
     /**
@@ -421,24 +966,25 @@ public class View extends JFrame {
     }
 
     /**
-     * Añade un mensaje del sistema en un bocadillo
+     * Muestra un mensaje de feedback del servidor en la pestaña derecha
+     * @param mensaje El mensaje de feedback a mostrar
      */
-    public void mostrarMensajeSistema(String mensaje) {
-        // Crear panel contenedor centrado
-        JPanel panelCentrado = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        panelCentrado.setBackground(new Color(245, 245, 245));
-        panelCentrado.setMaximumSize(new Dimension(Integer.MAX_VALUE, 55));
+    public void mostrarFeedback(String mensaje) {
+        // Crear un nuevo panel de mensaje de sistema
+        MensajeSistemaPanel mensajePanel = new MensajeSistemaPanel(mensaje);
+        mensajePanel.setBackground(new Color(240, 240, 240)); // Fondo gris claro
 
-        panelCentrado.add(new MensajeSistemaPanel(mensaje));
+        // Añadir con un espaciado vertical
+        areaFeedbackPanel.add(mensajePanel);
+        areaFeedbackPanel.add(Box.createVerticalStrut(10));
 
-        areaChatPanel.add(panelCentrado);
-        areaChatPanel.add(Box.createVerticalStrut(10));
-        areaChatPanel.revalidate();
-        areaChatPanel.repaint();
+        // Refrescar el área de feedback
+        areaFeedbackPanel.revalidate();
+        areaFeedbackPanel.repaint();
 
-        // Scroll al final
+        // Auto-scroll al final
         SwingUtilities.invokeLater(() -> {
-            JScrollPane scrollPane = (JScrollPane) areaChatPanel.getParent().getParent();
+            JScrollPane scrollPane = (JScrollPane) areaFeedbackPanel.getParent().getParent();
             scrollPane.getVerticalScrollBar().setValue(scrollPane.getVerticalScrollBar().getMaximum());
         });
     }
@@ -493,111 +1039,6 @@ public class View extends JFrame {
     }
 
     /**
-     * Genera un icono de sol mediante dibujo vectorial (Graphics2D)
-     */
-    private Icon createSunIcon(Color color) {
-        return new Icon() {
-            @Override
-            public void paintIcon(Component c, Graphics g, int x, int y) {
-                Graphics2D g2d = (Graphics2D) g.create();
-                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                
-                int size = 20;
-                int cx = x + size / 2;
-                int cy = y + size / 2;
-                int radius = 5;
-                
-                g2d.setColor(color);
-                g2d.setStroke(new BasicStroke(2, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                
-                // Rayos
-                for (int i = 0; i < 8; i++) {
-                    double angle = Math.PI * 2 * i / 8;
-                    int x1 = cx + (int) (Math.cos(angle) * (radius + 2));
-                    int y1 = cy + (int) (Math.sin(angle) * (radius + 2));
-                    int x2 = cx + (int) (Math.cos(angle) * (radius + 5));
-                    int y2 = cy + (int) (Math.sin(angle) * (radius + 5));
-                    g2d.drawLine(x1, y1, x2, y2);
-                }
-                // Centro
-                g2d.fillOval(cx - radius, cy - radius, radius * 2, radius * 2);
-                g2d.dispose();
-            }
-            @Override
-            public int getIconWidth() { return 20; }
-            @Override
-            public int getIconHeight() { return 20; }
-        };
-    }
-
-    // --- MÉTODOS DE ACTUALIZACIÓN DE ESTADO ---
-    public void establecerEstado(boolean conectado) {
-        if (conectado) {
-            lblEstado.setText("Estado: Conectado");
-            lblEstado.setForeground(new Color(39, 174, 96));
-            campoEntrada.setEnabled(true);
-            btnEnviar.setEnabled(true);
-            btnConectar.setEnabled(false);
-            btnDesconectar.setEnabled(true);
-            btnComandoList.setEnabled(true);
-            btnComandoPing.setEnabled(true);
-        } else {
-            lblEstado.setText("Estado: Desconectado");
-            lblEstado.setForeground(Color.RED);
-            campoEntrada.setEnabled(false);
-            btnEnviar.setEnabled(false);
-            btnConectar.setEnabled(true);
-            btnDesconectar.setEnabled(false);
-            btnComandoList.setEnabled(false);
-            btnComandoPing.setEnabled(false);
-        }
-    }
-
-
-    public void mostrarError(String titulo, String mensaje) {
-        JOptionPane.showMessageDialog(this, mensaje, titulo, JOptionPane.ERROR_MESSAGE);
-    }
-
-    public String[] solicitarDatosServidor() {
-        JPanel panel = new JPanel(new GridLayout(2, 2, 5, 5));
-        JTextField fieldHost = new JTextField("localhost", 15);
-        JTextField fieldPuerto = new JTextField("5000", 15);
-        panel.add(new JLabel("Host:"));
-        panel.add(fieldHost);
-        panel.add(new JLabel("Puerto:"));
-        panel.add(fieldPuerto);
-        int resultado = JOptionPane.showConfirmDialog(this, panel, "Datos del Servidor", JOptionPane.OK_CANCEL_OPTION);
-        if (resultado == JOptionPane.OK_OPTION) {
-            return new String[]{fieldHost.getText(), fieldPuerto.getText()};
-        }
-        return null;
-    }
-
-    public String solicitarNombreUsuario() {
-        return JOptionPane.showInputDialog(this, "Ingrese su nombre de usuario:", "");
-    }
-
-    public void establecerUsuario(String usuario) {
-        lblUsuario.setText("Usuario: " + usuario);
-    }
-
-    public String obtenerTextoEntrada() {
-        return campoEntrada.getText();
-    }
-
-    public void limpiarEntrada() {
-        campoEntrada.setText("");
-    }
-
-    // --- GETTERS DE BOTONES ---
-    public JButton obtenerBtnEnviar() { return btnEnviar; }
-    public JButton obtenerBtnConectar() { return btnConectar; }
-    public JButton obtenerBtnDesconectar() { return btnDesconectar; }
-    public JButton obtenerBtnList() { return btnComandoList; }
-    public JButton obtenerBtnPing() { return btnComandoPing; }
-    public JTextField obtenerCampoEntrada() { return campoEntrada; }
-
-    /**
      * Clase para renderizar un bocadillo de chat personalizado
      */
     public static class BocadilloChat extends JPanel {
@@ -605,6 +1046,7 @@ public class View extends JFrame {
         private boolean esDerecha;
         private Color colorFondo;
         private Color colorTexto;
+        private JLabel labelMensaje;
 
         public BocadilloChat(String mensaje, boolean esDerecha) {
             this.mensaje = mensaje;
@@ -621,256 +1063,155 @@ public class View extends JFrame {
 
             setOpaque(false);
             setLayout(new BorderLayout());
-            setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
+            setBorder(BorderFactory.createEmptyBorder(12, 18, 12, 12));
 
-            // JLabel con soporte para saltos de línea automáticos (HTML)
-            JLabel lbl = new JLabel("<html><p style='width: 150px;'>" + mensaje + "</p></html>");
-            lbl.setForeground(colorTexto);
-            lbl.setFont(new Font("Arial", Font.PLAIN, 13));
-            add(lbl, BorderLayout.CENTER);
+            // Usar JLabel con HTML para soportar enlaces clicables
+            labelMensaje = new JLabel();
+            labelMensaje.setForeground(colorTexto);
+            labelMensaje.setFont(new Font("Arial", Font.PLAIN, 13));
+            labelMensaje.setOpaque(false);
+
+            // Formatear el mensaje con enlaces si contiene URLs
+            String mensajeHTML;
+            if (UtilURLs.contieneURLs(mensaje)) {
+                mensajeHTML = "<html><p style='width: 150px; margin: 0;'>" +
+                        UtilURLs.formatearConEnlaces(mensaje) +
+                        "</p></html>";
+            } else {
+                mensajeHTML = "<html><p style='width: 150px; margin: 0;'>" + mensaje + "</p></html>";
+            }
+
+            labelMensaje.setText(mensajeHTML);
+
+            // Agregar MouseListener para detectar clicks en URLs
+            labelMensaje.addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseClicked(MouseEvent e) {
+                    procesarClickEnURL(e);
+                }
+
+                @Override
+                public void mouseMoved(MouseEvent e) {
+                    // Cambiar cursor cuando está sobre un enlace
+                    String htmlText = labelMensaje.getText();
+                    if (htmlText != null && htmlText.contains("<a href")) {
+                        setCursor(new Cursor(Cursor.HAND_CURSOR));
+                    } else {
+                        setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+                    }
+                }
+            });
+
+            add(labelMensaje, BorderLayout.CENTER);
+        }
+
+        /**
+         * Procesa los clicks en URLs dentro del mensaje
+         */
+        private void procesarClickEnURL(MouseEvent e) {
+            try {
+                // Buscar URLs en el mensaje original
+                java.util.List<String> urls = UtilURLs.extraerURLs(mensaje);
+
+                // Abrir la primera URL encontrada
+                if (!urls.isEmpty()) {
+                    UtilURLs.abrirURL(urls.get(0));
+                }
+
+            } catch (Exception ex) {
+                System.err.println("Error al procesar click: " + ex.getMessage());
+            }
         }
 
         @Override
         protected void paintComponent(Graphics g) {
-            Graphics2D g2d = (Graphics2D) g.create();
+            Graphics2D g2d = (Graphics2D) g;
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
             int ancho = getWidth();
             int alto = getHeight();
-            int radio = 20;
+            int radio = 18;
             int tamCola = 10;
+
+            // Crear camino para el bocadillo
+            RoundRectangle2D.Float formaBase;
+            Polygon cola = new Polygon();
 
             g2d.setColor(colorFondo);
 
-            // Dibujar el cuerpo del bocadillo
             if (esDerecha) {
-                // Cuerpo redondeado
-                g2d.fillRoundRect(0, 0, ancho - tamCola, alto, radio, radio);
+                // Bocadillo a la derecha con cola a la derecha
+                formaBase = new RoundRectangle2D.Float(0, 0, ancho - tamCola, alto, radio, radio);
+
+                // Dibujar el cuerpo redondeado
+                g2d.fill(formaBase);
+
                 // Dibujar la cola (derecha abajo)
-                int[] xPoints = {ancho - tamCola, ancho, ancho - tamCola};
-                int[] yPoints = {alto - 15, alto, alto - 5};
-                g2d.fillPolygon(xPoints, yPoints, 3);
+                int[] xPoints = {ancho - tamCola - 2, ancho, ancho - tamCola + 2};
+                int[] yPoints = {alto - 12, alto + 3, alto - 8};
+                cola = new Polygon(xPoints, yPoints, 3);
+                g2d.fillPolygon(cola);
             } else {
-                // Cuerpo redondeado
-                g2d.fillRoundRect(tamCola, 0, ancho - tamCola, alto, radio, radio);
+                // Bocadillo a la izquierda con cola a la izquierda
+                formaBase = new RoundRectangle2D.Float(tamCola, 0, ancho - tamCola, alto, radio, radio);
+
+                // Dibujar el cuerpo redondeado
+                g2d.fill(formaBase);
+
                 // Dibujar la cola (izquierda abajo)
-                int[] xPoints = {tamCola, 0, tamCola};
-                int[] yPoints = {alto - 15, alto, alto - 5};
-                g2d.fillPolygon(xPoints, yPoints, 3);
+                int[] xPoints = {tamCola + 2, 0, tamCola - 2};
+                int[] yPoints = {alto - 12, alto + 3, alto - 8};
+                cola = new Polygon(xPoints, yPoints, 3);
+                g2d.fillPolygon(cola);
             }
 
-            g2d.dispose();
             super.paintComponent(g);
         }
-    }
 
-    /**
-     * Panel personalizado para el menú extendido con icono de sol
-     */
-    public static class ExtendedMenuPanel extends JPanel {
-        private JButton sunButton;
-        private boolean isDarkMode = false;
-        
-        public ExtendedMenuPanel() {
-            setLayout(new BorderLayout());
-            setPreferredSize(new Dimension(250, 600));
-            
-            // Panel superior para el icono del sol
-            JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
-            topPanel.setOpaque(false);
-            
-            // Crear botón con icono de sol
-            sunButton = new JButton();
-            sunButton.setPreferredSize(new Dimension(40, 40));
-            sunButton.setContentAreaFilled(false);
-            sunButton.setBorderPainted(false);
-            sunButton.setFocusPainted(false);
-            sunButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-            sunButton.setToolTipText("Cambiar tema");
-            
-            // Añadir acción para cambiar tema
-            sunButton.addActionListener(e -> toggleTheme());
-            
-            topPanel.add(sunButton);
-            
-            // Panel central para el contenido del menú
-            JPanel contentPanel = new JPanel();
-            contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
-            
-            // Añadir opciones del menú (ejemplo)
-            addMenuItem(contentPanel, "Nueva conversación");
-            addMenuItem(contentPanel, "Historial");
-            addMenuItem(contentPanel, "Configuración");
-            addMenuItem(contentPanel, "Ayuda");
-            
-            // Añadir paneles al menú principal
-            add(topPanel, BorderLayout.NORTH);
-            add(contentPanel, BorderLayout.CENTER);
-            
-            // Aplicar tema inicial (claro)
-            applyLightTheme();
-        }
-        
         /**
-         * Añade un item al menú
+         * Método para actualizar el tema de un bocadillo existente
+         * Se debe llamar a este método para forzar la actualización del color en bocadillos ya creados
          */
-        private void addMenuItem(JPanel panel, String text) {
-            JButton item = new JButton(text);
-            item.setAlignmentX(Component.LEFT_ALIGNMENT);
-            item.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
-            item.setBorderPainted(false);
-            item.setFocusPainted(false);
-            item.setHorizontalAlignment(SwingConstants.LEFT);
-            item.setCursor(new Cursor(Cursor.HAND_CURSOR));
-            
-            panel.add(item);
-            panel.add(Box.createRigidArea(new Dimension(0, 5)));
-        }
-        
-        /**
-         * Alterna entre tema claro y oscuro
-         */
-        private void toggleTheme() {
-            isDarkMode = !isDarkMode;
-            if (isDarkMode) {
-                applyDarkTheme();
+        public void actualizarTema() {
+            if (esDerecha) {
+                this.colorFondo = new Color(0, 132, 255); // Azul
+                this.colorTexto = Color.WHITE;
             } else {
-                applyLightTheme();
+                this.colorFondo = new Color(233, 233, 235); // Gris claro
+                this.colorTexto = Color.BLACK;
             }
+
+            labelMensaje.setForeground(colorTexto);
+            labelMensaje.repaint();
+        }
+
+        /**
+         * Método para actualizar el tema de un bocadillo existente con soporte para modo oscuro
+         * @param esOscuro true para modo oscuro, false para modo claro
+         */
+        public void actualizarTema(boolean esOscuro) {
+            if (esOscuro) {
+                // Colores optimizados para modo oscuro (Material Design)
+                if (esDerecha) {
+                    this.colorFondo = new Color(10, 100, 200); // Azul más suave para el ojo
+                    this.colorTexto = Color.WHITE;
+                } else {
+                    this.colorFondo = new Color(50, 50, 50); // Gris oscuro más suave
+                    this.colorTexto = new Color(220, 220, 220); // Texto claro legible
+                }
+            } else {
+                // Colores para modo claro
+                if (esDerecha) {
+                    this.colorFondo = new Color(0, 132, 255); // Azul
+                    this.colorTexto = Color.WHITE;
+                } else {
+                    this.colorFondo = new Color(233, 233, 235); // Gris claro
+                    this.colorTexto = Color.BLACK;
+                }
+            }
+
+            labelMensaje.setForeground(colorTexto);
             repaint();
-        }
-        
-        /**
-         * Aplica tema claro
-         */
-        private void applyLightTheme() {
-            setBackground(Color.WHITE);
-            sunButton.setIcon(createSunIcon(Color.ORANGE));
-            // Actualizar colores de los items del menú
-            for (Component comp : getComponents()) {
-                if (comp instanceof JPanel) {
-                    updatePanelTheme((JPanel) comp, Color.WHITE, Color.BLACK);
-                }
-            }
-        }
-        
-        /**
-         * Aplica tema oscuro
-         */
-        private void applyDarkTheme() {
-            setBackground(new Color(30, 30, 30));
-            sunButton.setIcon(createMoonIcon(Color.LIGHT_GRAY));
-            // Actualizar colores de los items del menú
-            for (Component comp : getComponents()) {
-                if (comp instanceof JPanel) {
-                    updatePanelTheme((JPanel) comp, new Color(30, 30, 30), Color.WHITE);
-                }
-            }
-        }
-        
-        /**
-         * Actualiza el tema de un panel
-         */
-        private void updatePanelTheme(JPanel panel, Color bg, Color fg) {
-            panel.setBackground(bg);
-            for (Component comp : panel.getComponents()) {
-                if (comp instanceof JButton) {
-                    comp.setBackground(bg);
-                    comp.setForeground(fg);
-                } else if (comp instanceof JPanel) {
-                    updatePanelTheme((JPanel) comp, bg, fg);
-                }
-            }
-        }
-        
-        /**
-         * Crea un icono de sol personalizado
-         */
-        private Icon createSunIcon(Color color) {
-            return new Icon() {
-                @Override
-                public void paintIcon(Component c, Graphics g, int x, int y) {
-                    Graphics2D g2d = (Graphics2D) g.create();
-                    g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, 
-                                        RenderingHints.VALUE_ANTIALIAS_ON);
-                    
-                    int size = 24;
-                    int cx = x + size / 2;
-                    int cy = y + size / 2;
-                    int radius = 6;
-                    
-                    // Dibujar rayos del sol
-                    g2d.setColor(color);
-                    g2d.setStroke(new BasicStroke(2, BasicStroke.CAP_ROUND, 
-                                                 BasicStroke.JOIN_ROUND));
-                    for (int i = 0; i < 8; i++) {
-                        double angle = Math.PI * 2 * i / 8;
-                        int x1 = cx + (int) (Math.cos(angle) * (radius + 2));
-                        int y1 = cy + (int) (Math.sin(angle) * (radius + 2));
-                        int x2 = cx + (int) (Math.cos(angle) * (radius + 6));
-                        int y2 = cy + (int) (Math.sin(angle) * (radius + 6));
-                        g2d.drawLine(x1, y1, x2, y2);
-                    }
-                    
-                    // Dibujar círculo central
-                    g2d.fillOval(cx - radius, cy - radius, radius * 2, radius * 2);
-                    
-                    g2d.dispose();
-                }
-                
-                @Override
-                public int getIconWidth() { return 24; }
-                
-                @Override
-                public int getIconHeight() { return 24; }
-            };
-        }
-        
-        /**
-         * Crea un icono de luna para el modo oscuro
-         */
-        private Icon createMoonIcon(Color color) {
-            return new Icon() {
-                @Override
-                public void paintIcon(Component c, Graphics g, int x, int y) {
-                    Graphics2D g2d = (Graphics2D) g.create();
-                    g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, 
-                                        RenderingHints.VALUE_ANTIALIAS_ON);
-                    
-                    g2d.setColor(color);
-                    
-                    // Dibujar luna creciente
-                    Ellipse2D moon = new Ellipse2D.Double(x + 4, y + 2, 16, 20);
-                    Ellipse2D shadow = new Ellipse2D.Double(x + 8, y + 2, 16, 20);
-                    
-                    Area moonArea = new Area(moon);
-                    moonArea.subtract(new Area(shadow));
-                    
-                    g2d.fill(moonArea);
-                    
-                    g2d.dispose();
-                }
-                
-                @Override
-                public int getIconWidth() { return 24; }
-                
-                @Override
-                public int getIconHeight() { return 24; }
-            };
-        }
-        
-        /**
-         * Método de prueba
-         */
-        public static void main(String[] args) {
-            SwingUtilities.invokeLater(() -> {
-                JFrame frame = new JFrame("Menú con Icono de Sol");
-                frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-                frame.add(new ExtendedMenuPanel());
-                frame.pack();
-                frame.setLocationRelativeTo(null);
-                frame.setVisible(true);
-            });
         }
     }
 }

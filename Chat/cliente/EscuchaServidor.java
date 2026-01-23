@@ -1,4 +1,3 @@
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.logging.Logger;
@@ -147,7 +146,8 @@ public class EscuchaServidor implements Runnable {
      */
     private void procesarOK(String contenido) {
         logger.info("Respuesta OK: " + contenido);
-        mostrarEnUI("[OK] " + contenido);
+        String mensaje = "[OK] " + contenido;
+        SwingUtilities.invokeLater(() -> controlador.mostrarFeedback(mensaje));
     }
 
     /**
@@ -157,7 +157,8 @@ public class EscuchaServidor implements Runnable {
      */
     private void procesarError(String contenido) {
         logger.warning("Error del servidor: " + contenido);
-        mostrarEnUI("[ERROR] " + contenido);
+        String mensaje = "[ERROR] " + contenido;
+        SwingUtilities.invokeLater(() -> controlador.mostrarFeedback(mensaje));
         mostrarErrorEnUI("Error del Servidor", contenido);
     }
 
@@ -177,8 +178,8 @@ public class EscuchaServidor implements Runnable {
 
         logger.info("Mensaje de chat de " + remitente + ": " + contenido);
 
-        String mensajeFormato = remitente + ": " + contenido;
-        mostrarEnUI(mensajeFormato);
+        // Mostrar el mensaje en el chat con el formato: "Remitente: contenido"
+        SwingUtilities.invokeLater(() -> controlador.mostrarMensajeRecibido(remitente, contenido));
     }
 
     /**
@@ -188,7 +189,8 @@ public class EscuchaServidor implements Runnable {
      */
     private void procesarLista(String contenido) {
         logger.info("Lista de usuarios recibida: " + contenido);
-        mostrarEnUI("[USUARIOS] " + contenido);
+        String mensaje = "[USUARIOS] " + contenido;
+        SwingUtilities.invokeLater(() -> controlador.mostrarFeedback(mensaje));
     }
 
     /**
@@ -198,7 +200,8 @@ public class EscuchaServidor implements Runnable {
      */
     private void procesarPong(String contenido) {
         logger.info("PONG recibido: " + contenido);
-        mostrarEnUI("[PING] Servidor respondió: " + contenido);
+        String mensaje = "[PING] Servidor respondió: " + contenido;
+        SwingUtilities.invokeLater(() -> controlador.mostrarFeedback(mensaje));
     }
 
     /**
@@ -208,7 +211,8 @@ public class EscuchaServidor implements Runnable {
      */
     private void procesarNotificacion(String contenido) {
         logger.info("Notificación del sistema: " + contenido);
-        mostrarEnUI("[NOTIFICACIÓN] " + contenido);
+        String mensaje = "[NOTIFICACIÓN] " + contenido;
+        SwingUtilities.invokeLater(() -> controlador.mostrarFeedback(mensaje));
     }
 
     /**
@@ -219,7 +223,8 @@ public class EscuchaServidor implements Runnable {
     private void procesarCierreServidor(String contenido) {
         logger.severe("¡El servidor se desconectó!");
         mostrarErrorEnUI("Desconexión del Servidor", "El servidor se desconectó");
-        mostrarEnUI("[⚠️ ALERTA] El servidor se desconectó");
+        String mensaje = "[⚠️ ALERTA] El servidor se desconectó";
+        SwingUtilities.invokeLater(() -> controlador.mostrarFeedback(mensaje));
         escuchando = false;
     }
 

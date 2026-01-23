@@ -276,8 +276,21 @@ public class Controller {
     }
 
     /**
-     * Muestra un mensaje en la vista
-     * Llamado por EscuchaServidor cuando recibe mensajes del servidor
+     * Muestra un mensaje recibido de otro usuario
+     * Llamado por EscuchaServidor cuando se recibe un mensaje de chat
+     *
+     * @param remitente Nombre del usuario que envió el mensaje
+     * @param contenido Contenido del mensaje
+     */
+    public void mostrarMensajeRecibido(String remitente, String contenido) {
+        // Usar SwingUtilities para actualizar UI desde el hilo de escucha
+        String mensajeFormato = remitente + ": " + contenido;
+        SwingUtilities.invokeLater(() -> vista.mostrarMensaje(mensajeFormato, false));
+    }
+
+    /**
+     * Muestra un mensaje en el chat
+     * Llamado por EscuchaServidor para mensajes del sistema
      *
      * @param mensaje El mensaje a mostrar
      */
@@ -309,6 +322,17 @@ public class Controller {
         });
     }
 
+
+    /**
+     * Muestra un mensaje de feedback del servidor en la pestaña derecha
+     * Llamado por EscuchaServidor cuando recibe mensajes de feedback ([OK], [ERROR], etc.)
+     *
+     * @param mensaje El mensaje de feedback a mostrar
+     */
+    public void mostrarFeedback(String mensaje) {
+        // Usar SwingUtilities para actualizar UI desde el hilo de escucha
+        SwingUtilities.invokeLater(() -> vista.mostrarFeedback(mensaje));
+    }
 
     /**
      * Obtiene el modelo
