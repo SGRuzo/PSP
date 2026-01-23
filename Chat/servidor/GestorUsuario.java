@@ -1,4 +1,3 @@
-
 import java.io.PrintWriter;
 import java.util.Collections;
 import java.util.Map;
@@ -42,11 +41,12 @@ public class GestorUsuario {
     }
 
     /**
-     * Registra un nuevo usuario en el sistema
+     * Registra un nuevo usuario en el sistema.
+     * Si el nombre de usuario ya existe, desconecta la sesión anterior.
      *
      * @param nombreUsuario Identificador único del usuario
      * @param salida PrintWriter para enviar mensajes a este cliente
-     * @return true si se registró correctamente, false si el usuario ya existía
+     * @return true si se registró correctamente, false si hay error
      */
     public boolean registrarUsuario(String nombreUsuario, PrintWriter salida) {
         if (nombreUsuario == null || nombreUsuario.trim().isEmpty()) {
@@ -54,9 +54,24 @@ public class GestorUsuario {
             return false;
         }
 
+        // IMPORTANTE: Verificar si el nombre ya existe
         if (usuariosConectados.containsKey(nombreUsuario)) {
-            logger.warning("Intento de registrar usuario duplicado: " + nombreUsuario);
-            return false;
+            logger.warning("Usuario duplicado detectado: " + nombreUsuario + ". Desconectando sesión anterior.");
+
+            // Obtener el PrintWriter anterior y cerrarlo
+            PrintWriter antiguo = usuariosConectados.get(nombreUsuario);
+            if (antiguo != null) {
+                try {
+                    antiguo.close();
+                    logger.info("Conexión anterior de " + nombreUsuario + " cerrada");
+                } catch (Exception e) {
+                    logger.warning("Error al cerrar conexión anterior: " + e.getMessage());
+                }
+            }
+
+            // Remover el usuario antiguo del sistema
+            usuariosConectados.remove(nombreUsuario);
+            locksUsuarios.remove(nombreUsuario);
         }
 
         usuariosConectados.put(nombreUsuario, salida);
@@ -175,16 +190,18 @@ public class GestorUsuario {
 
     /**
      * Realiza BROADCASTING: envía un mensaje a todos los usuarios conectados
-     * excepto al remitente (opcional)
-     * Usa snapshot sincronizado para evitar TOCTOU (time-of-check, time-of-use)
+     * excepto al remitente (opcional).
+     * Usa snapshot sincronizado para evitar TOCTOU (time-of-check, time-of-use).
+     * Es robusto ante desconexiones inesperadas de sockets durante el envío.
      *
      * @param remitente Usuario que envía el mensaje
      * @param contenido Contenido del mensaje
      * @param excluirRemitente Si es true, no se envía el mensaje al remitente
-     * @return Cantidad de usuarios a los que se envió el mensaje
+     * @return Cantidad de usuarios a los que se envió el mensaje correctamente
      */
     public int broadcasting(String remitente, String contenido, boolean excluirRemitente) {
         int enviados = 0;
+        int fallos = 0;
         String mensaje = Protocolo.empaquetar(Protocolo.MSG, remitente, contenido);
 
         // Crear snapshot sincronizado de usuarios para evitar cambios durante iteración
@@ -208,40 +225,55 @@ public class GestorUsuario {
             if (lock != null && salida != null) {
                 synchronized (lock) {
                     try {
-                        salida.println(mensaje);
-                        salida.flush();
-                        enviados++;
+                        // Verificar que el PrintWriter no esté en estado de error
+                        if (!salida.checkError()) {
+                            salida.println(mensaje);
+                            salida.flush();
+                            enviados++;
+                        } else {
+                            logger.warning("PrintWriter en error para usuario: " + usuario);
+                            fallos++;
+                        }
                     } catch (Exception e) {
                         logger.warning("Error al enviar mensaje a " + usuario + ": " + e.getMessage());
-                        // No remover aquí, permitir que ManejadorCliente lo haga
+                        fallos++;
+                        // NO remover aquí, permitir que ManejadorCliente lo haga
+                        // Continuar con el siguiente usuario en lugar de fallar todo
                     }
                 }
             }
         }
 
-        logger.info("Mensaje de broadcasting enviado a " + enviados + " usuarios");
+        if (fallos > 0) {
+            logger.warning("Broadcasting completado: " + enviados + " enviados, " + fallos + " fallos");
+        } else {
+            logger.info("Mensaje de broadcasting enviado a " + enviados + " usuarios");
+        }
+
         return enviados;
     }
 
     /**
-     * Realiza BROADCASTING a todos los usuarios incluyendo al remitente
+     * Realiza BROADCASTING a todos los usuarios EXCEPTO al remitente
+     * De esta forma, el usuario que envía el mensaje no lo recibe de vuelta
      *
      * @param remitente Usuario que envía el mensaje
      * @param contenido Contenido del mensaje
      * @return Cantidad de usuarios a los que se envió el mensaje
      */
     public int broadcastingGlobal(String remitente, String contenido) {
-        return broadcasting(remitente, contenido, false);
+        return broadcasting(remitente, contenido, true);  // ✅ CAMBIO: true para excluir remitente
     }
 
     /**
      * Notifica a todos los usuarios que un nuevo usuario se ha conectado
      * Usa snapshot sincronizado para evitar TOCTOU
+     * Es robusto ante fallos de envío a usuarios individuales
      *
      * @param nombreUsuario Nombre del usuario que se conectó
      */
     private void notificarConexionUsuario(String nombreUsuario) {
-        String contenido = nombreUsuario + " se ha conectado al chat";
+        String contenido = nombreUsuario + " acaba de conectarse a este chat";
         String mensaje = Protocolo.empaquetar("NOTIFICACION", contenido);
 
         // Crear snapshot sincronizado de usuarios
@@ -250,33 +282,52 @@ public class GestorUsuario {
             snapshot = new java.util.HashMap<>(usuariosConectados);
         }
 
+        int notificados = 0;
+        int fallos = 0;
+
         // Iterar sobre el snapshot
         for (Map.Entry<String, PrintWriter> entrada : snapshot.entrySet()) {
             String usuario = entrada.getKey();
             PrintWriter salida = entrada.getValue();
 
+            // Excluir al usuario que se acaba de conectar
+            if (usuario.equals(nombreUsuario)) {
+                continue;
+            }
+
             Object lock = locksUsuarios.get(usuario);
             if (lock != null && salida != null) {
                 synchronized (lock) {
                     try {
-                        salida.println(mensaje);
-                        salida.flush();
+                        if (!salida.checkError()) {
+                            salida.println(mensaje);
+                            salida.flush();
+                            notificados++;
+                        } else {
+                            fallos++;
+                        }
                     } catch (Exception e) {
                         logger.warning("Error al notificar conexión a " + usuario + ": " + e.getMessage());
+                        fallos++;
                     }
                 }
             }
+        }
+
+        if (fallos > 0) {
+            logger.fine("Notificación de conexión: " + notificados + " enviadas, " + fallos + " fallos");
         }
     }
 
     /**
      * Notifica a todos los usuarios que un usuario se ha desconectado
      * Usa snapshot sincronizado para evitar TOCTOU
+     * Es robusto ante fallos de envío a usuarios individuales
      *
      * @param nombreUsuario Nombre del usuario que se desconectó
      */
     private void notificarDesconexionUsuario(String nombreUsuario) {
-        String contenido = nombreUsuario + " se ha desconectado del chat";
+        String contenido = nombreUsuario + " dejó este chat";
         String mensaje = Protocolo.empaquetar("NOTIFICACION", contenido);
 
         // Crear snapshot sincronizado de usuarios
@@ -284,6 +335,9 @@ public class GestorUsuario {
         synchronized (usuariosConectados) {
             snapshot = new java.util.HashMap<>(usuariosConectados);
         }
+
+        int notificados = 0;
+        int fallos = 0;
 
         // Iterar sobre el snapshot
         for (Map.Entry<String, PrintWriter> entrada : snapshot.entrySet()) {
@@ -294,14 +348,45 @@ public class GestorUsuario {
             if (lock != null && salida != null) {
                 synchronized (lock) {
                     try {
-                        salida.println(mensaje);
-                        salida.flush();
+                        if (!salida.checkError()) {
+                            salida.println(mensaje);
+                            salida.flush();
+                            notificados++;
+                        } else {
+                            fallos++;
+                        }
                     } catch (Exception e) {
                         logger.warning("Error al notificar desconexión a " + usuario + ": " + e.getMessage());
+                        fallos++;
                     }
                 }
             }
         }
+
+        if (fallos > 0) {
+            logger.fine("Notificación de desconexión: " + notificados + " enviadas, " + fallos + " fallos");
+        }
+    }
+
+    /**
+     * Obtiene el mensaje de notificación de conexión para mostrar en el servidor
+     *
+     * @param nombreUsuario Nombre del usuario que se conectó
+     * @return Mensaje formateado para mostrar en la consola del servidor
+     */
+    public String obtenerMensajeConexion(String nombreUsuario) {
+        int cantidadUsuarios = usuariosConectados.size();
+        return "> Nuevo cliente conectado (" + nombreUsuario + "). Actualmente hay " + cantidadUsuarios + " usuarios conectados";
+    }
+
+    /**
+     * Obtiene el mensaje de notificación de desconexión para mostrar en el servidor
+     *
+     * @param nombreUsuario Nombre del usuario que se desconectó
+     * @return Mensaje formateado para mostrar en la consola del servidor
+     */
+    public String obtenerMensajeDesconexion(String nombreUsuario) {
+        return nombreUsuario + " dejó este chat";
     }
 
     /**
@@ -313,6 +398,69 @@ public class GestorUsuario {
         return String.format("GestorUsuarios - Conectados: %d, Usuarios: %s",
             usuariosConectados.size(),
             obtenerListaUsuarios());
+    }
+
+    /**
+     * Obtiene el estado de monitoreo: muestra "Ningún cliente conectado" si está vacío
+     * o la lista de usuarios conectados con su cantidad
+     *
+     * @return String con el estado de monitoreo para mostrar en consola
+     */
+    public String obtenerEstadoMonitoreo() {
+        if (usuariosConectados.isEmpty()) {
+            return "Ningún cliente conectado";
+        }
+        int cantidad = usuariosConectados.size();
+        String listaUsuarios = obtenerListaUsuarios();
+        return "(" + cantidad + " conectados) " + listaUsuarios;
+    }
+
+    /**
+     * Notifica a todos los usuarios que el servidor se está cerrando
+     * Se ejecuta antes de desconectar todos los usuarios
+     * Es robusto ante fallos de envío a usuarios individuales
+     */
+    public void notificarCierreServidor() {
+        logger.info("Notificando cierre del servidor a todos los clientes...");
+        String mensaje = Protocolo.empaquetar(Protocolo.SERVIDOR_DESCONECTADO, "El servidor se desconectó");
+
+        // Crear snapshot sincronizado de usuarios
+        Map<String, PrintWriter> snapshot;
+        synchronized (usuariosConectados) {
+            snapshot = new java.util.HashMap<>(usuariosConectados);
+        }
+
+        int notificados = 0;
+        int fallos = 0;
+
+        // Iterar sobre el snapshot
+        for (Map.Entry<String, PrintWriter> entrada : snapshot.entrySet()) {
+            String usuario = entrada.getKey();
+            PrintWriter salida = entrada.getValue();
+
+            Object lock = locksUsuarios.get(usuario);
+            if (lock != null && salida != null) {
+                synchronized (lock) {
+                    try {
+                        if (!salida.checkError()) {
+                            salida.println(mensaje);
+                            salida.flush();
+                            notificados++;
+                        } else {
+                            fallos++;
+                        }
+                        logger.fine("Mensaje de cierre enviado a " + usuario);
+                    } catch (Exception e) {
+                        logger.warning("Error al notificar cierre a " + usuario + ": " + e.getMessage());
+                        fallos++;
+                    }
+                }
+            }
+        }
+
+        if (fallos > 0) {
+            logger.fine("Notificación de cierre: " + notificados + " enviadas, " + fallos + " fallos");
+        }
     }
 
     /**

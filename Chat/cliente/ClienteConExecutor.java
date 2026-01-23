@@ -1,4 +1,5 @@
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
@@ -80,7 +81,33 @@ public class ClienteConExecutor {
     }
 
     /**
-     * Desconecta del servidor y detiene el executor
+     * Envía un comando al servidor usando el protocolo de empaquetación
+     * Este es el método principal para enviar cualquier tipo de comando (LOGIN, MSG, LIST, PING, BYE)
+     *
+     * @param comando El tipo de comando a enviar
+     * @param params Parámetros adicionales del comando (variable arguments)
+     * @throws IOException Si hay problemas al enviar
+     */
+    public void enviarComando(String comando, String... params) throws IOException {
+        if (salida == null || salida.checkError()) {
+            throw new IOException("No hay conexión con el servidor");
+        }
+
+        try {
+            // Empaquetar usando el protocolo
+            String mensaje = Protocolo.empaquetar(comando, params);
+            salida.println(mensaje);
+            logger.fine("Comando enviado: " + comando + " con " + params.length + " parámetro(s)");
+        } catch (Exception e) {
+            logger.severe("Error al enviar comando " + comando + ": " + e.getMessage());
+            throw new IOException("Error al enviar comando", e);
+        }
+    }
+
+    /**
+     * Desconecta del servidor SIN apagar el executor
+     * El executor se mantiene vivo para permitir reconexiones
+     * Solo se apaga en Main cuando se cierra la aplicación completamente
      */
     public void desconectar() {
         logger.info("Iniciando desconexión...");
@@ -92,7 +119,7 @@ public class ClienteConExecutor {
                 logger.info("EscuchaServidor detenido");
             }
 
-            // Cancelar el Future
+            // Cancelar el Future (NO apagar el executor)
             if (escuchaFuture != null) {
                 escuchaFuture.cancel(true);
                 logger.info("Future cancelado");
@@ -113,9 +140,9 @@ public class ClienteConExecutor {
         } catch (Exception e) {
             logger.warning("Error al desconectar: " + e.getMessage());
         } finally {
-            // Detener el executor
-            executor.shutdownNow();
-            logger.info("ExecutorService detenido - Cliente desconectado");
+            // NO apagar el executor aquí - se mantiene para reconexiones futuras
+            // El executor se apaga únicamente en Main.shutdownExecutor() al cerrar la aplicación
+            logger.info("Cliente desconectado - ExecutorService disponible para reconexión");
             controlador.mostrarMensaje("[DESCONECTADO] Desconectado del servidor");
         }
     }

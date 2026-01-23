@@ -79,7 +79,7 @@ public class ChatServer {
      * Cada conexión se asigna a un hilo del thread pool
      */
     private void aceptarConexiones() {
-        logger.info("Esperando conexiones de clientes...");
+        logger.info("Ningún cliente conectado");
 
         while (ejecutandose) {
             try {
@@ -118,6 +118,11 @@ public class ChatServer {
     public synchronized void detenerServidor() {
         logger.info("Deteniendo servidor...");
         ejecutandose = false;
+
+        // Notificar a todos los usuarios que el servidor se cierra
+        if (gestorUsuarios != null) {
+            gestorUsuarios.notificarCierreServidor();
+        }
 
         // Desconectar todos los usuarios
         if (gestorUsuarios != null) {

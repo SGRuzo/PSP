@@ -36,7 +36,7 @@ public class Servidor {
 
             System.out.println("✓ Servidor iniciado correctamente");
             System.out.println();
-            System.out.println("Esperando conexiones de clientes...");
+            System.out.println("Ningún cliente conectado");
             System.out.println("Presione CTRL+C para detener el servidor");
             System.out.println();
 

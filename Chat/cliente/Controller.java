@@ -1,5 +1,4 @@
 import javax.swing.*;
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.logging.Logger;
 
@@ -93,12 +92,9 @@ public class Controller {
     }
 
     /**
-     * Conecta al servidor usando el modelo
-     *
-     * @param host Dirección del servidor
-     * @param puerto Puerto del servidor
-    /**
-     * Conecta al servidor usando ClienteConExecutor
+     * Conecta al servidor usando ClienteConExecutor con UN ÚNICO SOCKET
+     * IMPORTANTE: Se utiliza un único socket bidireccional para enviar y recibir mensajes
+     * Esto evita problemas de sincronización entre múltiples conexiones
      *
      * @param host Dirección del servidor
      * @param puerto Puerto del servidor
@@ -113,29 +109,27 @@ public class Controller {
                 clienteExecutor = new ClienteConExecutor(this);
             }
 
-            // Conectar usando ExecutorService internamente
+            // ✅ UN ÚNICO SOCKET creado aquí
             clienteExecutor.conectar(host, puerto);
-            logger.info("ClienteConExecutor conectado");
+            logger.info("ClienteConExecutor conectado con UN socket");
 
-            // Enviar comando LOGIN usando el modelo
-            modelo.conectar(host, puerto);
-            modelo.enviarComando(Protocolo.LOGIN, usuario);
-            logger.info("Comando LOGIN enviado");
+            // ✅ ENVIAR LOGIN por EL MISMO SOCKET
+            clienteExecutor.enviarComando(Protocolo.LOGIN, usuario);
+            logger.info("Comando LOGIN enviado por el mismo socket");
 
             // Actualizar UI
             conectado = true;
             nombreUsuario = usuario;
-            modelo.establecerNombreUsuario(usuario);
             vista.establecerEstado(true);
             vista.establecerUsuario(nombreUsuario);
-            vista.mostrarMensaje("[SISTEMA] Conectado como " + nombreUsuario);
-            logger.info("Cliente conectado y en escucha con ExecutorService");
+            vista.mostrarMensajeSistema("[SISTEMA] Conectado como " + nombreUsuario);
+            vista.mostrarMensajeSistema("Conectado a la sala de chat");
+            logger.info("Cliente conectado y escuchando por UN ÚNICO socket");
 
         } catch (IOException e) {
             logger.severe("Error al conectar: " + e.getMessage());
             vista.mostrarError("Error de Conexión", "No se pudo conectar a " + host + ":" + puerto);
             conectado = false;
-            modelo.desconectar();
             vista.establecerEstado(false);
         } catch (Exception e) {
             logger.severe("Error inesperado: " + e.getMessage());
@@ -156,8 +150,8 @@ public class Controller {
         }
 
         try {
-            // Enviar comando BYE usando el modelo
-            modelo.enviarComando(Protocolo.BYE);
+            // ✅ Enviar comando BYE por el ÚNICO socket
+            clienteExecutor.enviarComando(Protocolo.BYE);
             logger.info("Comando BYE enviado");
 
             // Esperar un poco para que el servidor responda
@@ -185,7 +179,7 @@ public class Controller {
         // 1. Marcar como desconectado (evita circular waits)
         conectado = false;
 
-        // 2. Detener ClienteConExecutor (cierra executor, escucha, y sockets)
+        // 2. Detener ClienteConExecutor (cierra executor, escucha, y socket)
         if (clienteExecutor != null) {
             try {
                 clienteExecutor.desconectar();
@@ -196,17 +190,9 @@ public class Controller {
             clienteExecutor = null;
         }
 
-        // 3. Cerrar conexión del modelo (solo después de detener executor)
-        try {
-            modelo.desconectar();
-            logger.info("Modelo desconectado");
-        } catch (Exception e) {
-            logger.warning("Error al desconectar modelo: " + e.getMessage());
-        }
-
-        // 4. Actualizar UI
+        // 3. Actualizar UI
         vista.establecerEstado(false);
-        vista.mostrarMensaje("[SISTEMA] Desconectado");
+        vista.mostrarMensajeSistema("[SISTEMA] Desconectado");
         nombreUsuario = null;
 
         logger.info("Desconexión completada");
@@ -230,12 +216,11 @@ public class Controller {
         logger.info("Enviando mensaje: " + mensaje);
 
         try {
-            // Usar clienteExecutor para enviar el mensaje de forma segura
-            String mensajeFormato = Protocolo.empaquetar(Protocolo.MSG, nombreUsuario, mensaje);
-            clienteExecutor.enviarMensaje(mensajeFormato);
+            // ✅ Usar ClienteConExecutor para enviar por el ÚNICO socket
+            clienteExecutor.enviarComando(Protocolo.MSG, mensaje);
 
             // Mostrar el mensaje en la vista
-            vista.mostrarMensaje("Yo: " + mensaje);
+            vista.mostrarMensaje("Yo: " + mensaje, true);
 
             // Limpiar campo de entrada
             vista.limpiarEntrada();
@@ -258,7 +243,8 @@ public class Controller {
         logger.info("Comando: /list");
 
         try {
-            modelo.enviarComando(Protocolo.LIST);
+            // ✅ Usar ClienteConExecutor para enviar por el ÚNICO socket
+            clienteExecutor.enviarComando(Protocolo.LIST);
             logger.info("Comando LIST enviado");
 
         } catch (IOException e) {
@@ -279,7 +265,8 @@ public class Controller {
         logger.info("Comando: /ping");
 
         try {
-            modelo.enviarComando(Protocolo.PING);
+            // ✅ Usar ClienteConExecutor para enviar por el ÚNICO socket
+            clienteExecutor.enviarComando(Protocolo.PING);
             logger.info("Comando PING enviado");
 
         } catch (IOException e) {
@@ -296,7 +283,7 @@ public class Controller {
      */
     public void mostrarMensaje(String mensaje) {
         // Usar SwingUtilities para actualizar UI desde el hilo de escucha
-        SwingUtilities.invokeLater(() -> vista.mostrarMensaje(mensaje));
+        SwingUtilities.invokeLater(() -> vista.mostrarMensaje(mensaje, false));
     }
 
     /**

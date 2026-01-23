@@ -105,6 +105,10 @@ public class EscuchaServidor implements Runnable {
                     procesarNotificacion(contenido);
                     break;
 
+                case Protocolo.SERVIDOR_DESCONECTADO:
+                    procesarCierreServidor(contenido);
+                    break;
+
                 default:
                     logger.warning("Tipo de mensaje desconocido: " + tipo);
                     mostrarEnUI("[SISTEMA] Mensaje desconocido: " + tipo);
@@ -205,6 +209,18 @@ public class EscuchaServidor implements Runnable {
     private void procesarNotificacion(String contenido) {
         logger.info("Notificación del sistema: " + contenido);
         mostrarEnUI("[NOTIFICACIÓN] " + contenido);
+    }
+
+    /**
+     * Procesa la notificación de cierre del servidor
+     *
+     * @param contenido El contenido del mensaje de cierre
+     */
+    private void procesarCierreServidor(String contenido) {
+        logger.severe("¡El servidor se desconectó!");
+        mostrarErrorEnUI("Desconexión del Servidor", "El servidor se desconectó");
+        mostrarEnUI("[⚠️ ALERTA] El servidor se desconectó");
+        escuchando = false;
     }
 
     /**

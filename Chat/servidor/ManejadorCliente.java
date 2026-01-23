@@ -1,7 +1,6 @@
 
 import java.io.*;
 import java.net.Socket;
-import java.net.SocketTimeoutException;
 import java.util.logging.Logger;
 
 /**
@@ -14,7 +13,6 @@ import java.util.logging.Logger;
  */
 public class ManejadorCliente implements Runnable {
     private static final Logger logger = Logger.getLogger(ManejadorCliente.class.getName());
-    private static final int SOCKET_TIMEOUT = 30000;  // 30 segundos
 
     private final Socket socketCliente;
     private final int idCliente;
@@ -58,21 +56,17 @@ public class ManejadorCliente implements Runnable {
 
 
     /**
-     * Inicializa los streams de entrada y salida con timeout
+     * Inicializa los streams de entrada y salida
      *
      * @throws IOException Si hay problemas al crear los streams
      */
     private void inicializarStreams() throws IOException {
         try {
-            // Configurar timeout del socket para evitar bloqueos indefinidos
-            socketCliente.setSoTimeout(SOCKET_TIMEOUT);
-
             entrada = new BufferedReader(new InputStreamReader(socketCliente.getInputStream()));
             salida = new PrintWriter(socketCliente.getOutputStream(), true);
             conectado = true;
 
-            logger.info("Streams inicializados para cliente #" + idCliente +
-                       " con timeout de " + SOCKET_TIMEOUT + "ms");
+            logger.info("Streams inicializados para cliente #" + idCliente);
         } catch (IOException e) {
             logger.severe("Error al inicializar streams para cliente #" + idCliente);
             throw e;
@@ -101,10 +95,6 @@ public class ManejadorCliente implements Runnable {
                 // Procesar el comando recibido (no bloqueante)
                 procesarComando(comando, partes);
             }
-        } catch (SocketTimeoutException e) {
-            logger.warning("Timeout en cliente #" + idCliente +
-                          ": Sin actividad en " + SOCKET_TIMEOUT + "ms");
-            conectado = false;
         } catch (IOException e) {
             if (conectado) {
                 logger.warning("Desconexión del cliente #" + idCliente + ": " + e.getMessage());
@@ -181,17 +171,13 @@ public class ManejadorCliente implements Runnable {
             return;
         }
 
-        // Validar que el usuario no esté ya registrado
-        if (gestorUsuarios.usuarioConectado(nuevoNombre)) {
-            logger.warning("Intento de login con usuario duplicado: " + nuevoNombre);
-            enviarRespuesta(Protocolo.ERROR, "El usuario " + nuevoNombre + " ya está conectado");
-            return;
-        }
-
         // Registrar el usuario en el GestorUsuarios
+        // Si el nombre ya existe, el GestorUsuario desconectará la sesión anterior automáticamente
         if (gestorUsuarios.registrarUsuario(nuevoNombre, salida)) {
             this.nombreUsuario = nuevoNombre;
             logger.info("Cliente #" + idCliente + " autenticado como: " + nombreUsuario);
+            // Mostrar notificación en la consola del servidor
+            System.out.println(gestorUsuarios.obtenerMensajeConexion(nombreUsuario));
             enviarRespuesta(Protocolo.OK, "Login exitoso como " + nombreUsuario +
                           ". Usuarios conectados: " + gestorUsuarios.obtenerCantidadUsuarios());
         } else {
@@ -272,6 +258,8 @@ public class ManejadorCliente implements Runnable {
         } else {
             logger.info(nombreUsuario + " (#" + idCliente + ") solicita desconexión");
             gestorUsuarios.desconectarUsuario(nombreUsuario);
+            // Mostrar estado actual de la lista de usuarios
+            System.out.println(gestorUsuarios.obtenerEstadoMonitoreo());
         }
 
         enviarRespuesta(Protocolo.OK, "Desconexión confirmada");
@@ -305,6 +293,10 @@ public class ManejadorCliente implements Runnable {
         // Desconectar del gestor si estaba registrado
         if (nombreUsuario != null) {
             gestorUsuarios.desconectarUsuario(nombreUsuario);
+            // Mostrar notificación en la consola del servidor
+            System.out.println(gestorUsuarios.obtenerMensajeDesconexion(nombreUsuario));
+            // Mostrar estado actual de la lista de usuarios (incluyendo cuando está vacía)
+            System.out.println(gestorUsuarios.obtenerEstadoMonitoreo());
             logger.info("Usuario " + nombreUsuario + " desconectado del gestor");
         }
 
