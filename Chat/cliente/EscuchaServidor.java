@@ -211,8 +211,21 @@ public class EscuchaServidor implements Runnable {
      */
     private void procesarNotificacion(String contenido) {
         logger.info("Notificación del sistema: " + contenido);
-        String mensaje = "[NOTIFICACIÓN] " + contenido;
-        SwingUtilities.invokeLater(() -> controlador.mostrarFeedback(mensaje));
+
+        // Si es una notificación de desconexión, hacerla más visible
+        if (contenido.contains("abandonó el chat") || contenido.contains("dejó")) {
+            // Mostrar tanto en el área de feedback como en el área principal de chat
+            String mensaje = "[NOTIFICACIÓN] ⚠️ " + contenido;
+            SwingUtilities.invokeLater(() -> {
+                controlador.mostrarFeedback(mensaje);
+                controlador.mostrarMensaje(mensaje);
+            });
+            logger.info("Notificación de desconexión mostrada a usuario");
+        } else {
+            // Otras notificaciones (como conexión de usuarios)
+            String mensaje = "[NOTIFICACIÓN] " + contenido;
+            SwingUtilities.invokeLater(() -> controlador.mostrarFeedback(mensaje));
+        }
     }
 
     /**

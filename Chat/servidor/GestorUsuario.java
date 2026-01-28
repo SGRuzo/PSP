@@ -327,7 +327,7 @@ public class GestorUsuario {
      * @param nombreUsuario Nombre del usuario que se desconectó
      */
     private void notificarDesconexionUsuario(String nombreUsuario) {
-        String contenido = nombreUsuario + " dejó este chat";
+        String contenido = nombreUsuario + " abandonó el chat";
         String mensaje = Protocolo.empaquetar("NOTIFICACION", contenido);
 
         // Crear snapshot sincronizado de usuarios
@@ -338,6 +338,8 @@ public class GestorUsuario {
 
         int notificados = 0;
         int fallos = 0;
+
+        logger.info("Enviando notificación de desconexión para " + nombreUsuario + " a " + snapshot.size() + " usuarios activos");
 
         // Iterar sobre el snapshot
         for (Map.Entry<String, PrintWriter> entrada : snapshot.entrySet()) {
@@ -352,8 +354,10 @@ public class GestorUsuario {
                             salida.println(mensaje);
                             salida.flush();
                             notificados++;
+                            logger.fine("Notificación de desconexión enviada a " + usuario);
                         } else {
                             fallos++;
+                            logger.warning("PrintWriter en error para usuario: " + usuario);
                         }
                     } catch (Exception e) {
                         logger.warning("Error al notificar desconexión a " + usuario + ": " + e.getMessage());
@@ -363,9 +367,7 @@ public class GestorUsuario {
             }
         }
 
-        if (fallos > 0) {
-            logger.fine("Notificación de desconexión: " + notificados + " enviadas, " + fallos + " fallos");
-        }
+        logger.info("Notificación de desconexión completada: " + notificados + " enviadas, " + fallos + " fallos para " + nombreUsuario);
     }
 
     /**

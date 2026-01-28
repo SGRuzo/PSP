@@ -1,6 +1,5 @@
-
-
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
@@ -15,6 +14,9 @@ import java.util.logging.Logger;
  */
 public class ChatServer {
     private static final Logger logger = Logger.getLogger(ChatServer.class.getName());
+
+    // Límite máximo de usuarios concurrentes permitidos
+    private static final int MAX_USUARIOS = 2;
 
     private final int puerto;
     private ServerSocket serverSocket;
@@ -92,6 +94,28 @@ public class ChatServer {
 
                 logger.info("Nueva conexión #" + contadorConexiones + " desde " +
                            ipCliente + ":" + puertoCliente);
+
+                // Verificar límite de usuarios antes de crear el manejador
+                int usuariosConectados = gestorUsuarios.obtenerCantidadUsuarios();
+                if (usuariosConectados >= MAX_USUARIOS) {
+                    logger.info("Límite de usuarios alcanzado (" + usuariosConectados + "). Rechazando nueva conexión desde " + ipCliente + ":" + puertoCliente);
+                    try {
+                        PrintWriter rechazo = new PrintWriter(socketCliente.getOutputStream(), true);
+                        rechazo.println(Protocolo.empaquetar(Protocolo.ERROR, "Máximo de usuarios conectados: " + usuariosConectados + ". No se permiten más conexiones."));
+                        rechazo.flush();
+                    } catch (IOException e) {
+                        logger.warning("No se pudo notificar al cliente rechazado: " + e.getMessage());
+                    } finally {
+                        try {
+                            socketCliente.close();
+                        } catch (IOException e) {
+                            logger.warning("Error al cerrar socket del cliente rechazado: " + e.getMessage());
+                        }
+                    }
+
+                    // No encolar manejador ni crear hilo
+                    continue;
+                }
 
                 // 2. Crear manejador del cliente (implementa Runnable)
                 ManejadorCliente manejadorCliente = new ManejadorCliente(socketCliente, contadorConexiones, gestorUsuarios);

@@ -216,6 +216,24 @@ public class Controller {
         logger.info("Enviando mensaje: " + mensaje);
 
         try {
+            // Verificar si es un comando de slash
+            if (mensaje.equalsIgnoreCase("/bye")) {
+                logger.info("Comando detectado: /bye");
+                accionDesconectar();
+                vista.limpiarEntrada();
+                return;
+            } else if (mensaje.equalsIgnoreCase("/list")) {
+                logger.info("Comando detectado: /list");
+                accionComandoList();
+                vista.limpiarEntrada();
+                return;
+            } else if (mensaje.equalsIgnoreCase("/ping")) {
+                logger.info("Comando detectado: /ping");
+                accionComandoPing();
+                vista.limpiarEntrada();
+                return;
+            }
+
             // ✅ Usar ClienteConExecutor para enviar por el ÚNICO socket
             clienteExecutor.enviarComando(Protocolo.MSG, mensaje);
 
