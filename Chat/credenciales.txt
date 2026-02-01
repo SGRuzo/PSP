@@ -1,0 +1,12 @@
+# Archivo de credenciales del servidor de chat
+# Formato: usuario:hash_sha256:rol
+# Roles permitidos: USER, ADMIN
+
+# Usuario: juan, Contraseña: password
+# Usuario: maria, Contraseña: password
+# Usuario: admin, Contraseña: admin123
+
+juan:5e884898da28047151d0e56f8dc62927510d5be4b82212dd7282c91fdf92c4fd:USER
+maria:5e884898da28047151d0e56f8dc62927510d5be4b82212dd7282c91fdf92c4fd:USER
+admin:0192023a7bbd73250516f069df18b500b4eee9a1a27220006112e68e8f0efa5c:ADMIN
+

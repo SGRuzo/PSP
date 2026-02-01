@@ -1,4 +1,3 @@
-
 import java.io.*;
 import java.net.Socket;
 import java.util.logging.Logger;
@@ -6,7 +5,8 @@ import java.util.logging.Logger;
 /**
  * Manejador de cliente que se ejecuta en su propio hilo.
  * Gestiona la comunicación con un cliente específico.
- * Procesa el protocolo de texto plano y maneja comandos especiales como /list y /ping.
+ * Implementa autenticación obligatoria con contraseña y validación de roles.
+ * Procesa comandos de usuario y administración con control de permisos.
  *
  * Implementa Runnable en lugar de extender Thread (mejor práctica de separación de responsabilidades)
  * Se ejecuta en un hilo separado del ExecutorService del servidor.
@@ -20,21 +20,21 @@ public class ManejadorCliente implements Runnable {
     private BufferedReader entrada;
     private PrintWriter salida;
     private String nombreUsuario;
-    private volatile boolean conectado;  // volatile para visibilidad entre hilos
+    private String rolUsuario; // Rol autenticado del usuario
+    private volatile boolean conectado;
+    private volatile boolean autenticado; // Indica si el usuario pasó autenticación
 
     /**
      * Constructor del manejador de cliente
-     *
-     * @param socketCliente Socket del cliente conectado
-     * @param idCliente Identificador único del cliente
-     * @param gestorUsuarios Referencia al gestor de usuarios compartido
      */
     public ManejadorCliente(Socket socketCliente, int idCliente, GestorUsuario gestorUsuarios) {
         this.socketCliente = socketCliente;
         this.idCliente = idCliente;
         this.gestorUsuarios = gestorUsuarios;
         this.nombreUsuario = null;
+        this.rolUsuario = null;
         this.conectado = false;
+        this.autenticado = false;
         logger.info("ManejadorCliente #" + idCliente + " creado");
     }
 
@@ -54,18 +54,14 @@ public class ManejadorCliente implements Runnable {
         }
     }
 
-
     /**
      * Inicializa los streams de entrada y salida
-     *
-     * @throws IOException Si hay problemas al crear los streams
      */
     private void inicializarStreams() throws IOException {
         try {
             entrada = new BufferedReader(new InputStreamReader(socketCliente.getInputStream()));
             salida = new PrintWriter(socketCliente.getOutputStream(), true);
             conectado = true;
-
             logger.info("Streams inicializados para cliente #" + idCliente);
         } catch (IOException e) {
             logger.severe("Error al inicializar streams para cliente #" + idCliente);
@@ -75,6 +71,7 @@ public class ManejadorCliente implements Runnable {
 
     /**
      * Procesa los mensajes que llegan del cliente
+     * El cliente DEBE autenticarse primero antes de usar otros comandos
      */
     private void procesarMensajes() {
         String linea;
@@ -82,7 +79,6 @@ public class ManejadorCliente implements Runnable {
             while (conectado && (linea = entrada.readLine()) != null) {
                 logger.info("Mensaje recibido de cliente #" + idCliente + ": " + linea);
 
-                // Desempaquetar el mensaje usando el protocolo
                 String[] partes = Protocolo.desempaquetar(linea.trim());
 
                 if (partes.length == 0) {
@@ -91,8 +87,6 @@ public class ManejadorCliente implements Runnable {
                 }
 
                 String comando = partes[0];
-
-                // Procesar el comando recibido (no bloqueante)
                 procesarComando(comando, partes);
             }
         } catch (IOException e) {
@@ -106,16 +100,24 @@ public class ManejadorCliente implements Runnable {
 
     /**
      * Procesa un comando recibido del cliente
-     *
-     * @param comando El comando a procesar
-     * @param partes Array con los componentes del mensaje desempaquetado
+     * IMPORTANTE: LOGIN es el único comando permitido sin autenticación
      */
     private void procesarComando(String comando, String[] partes) {
-        switch (comando) {
-            case Protocolo.LOGIN:
-                procesarLogin(partes);
-                break;
+        // El LOGIN es el único comando permitido antes de autenticarse
+        if (Protocolo.LOGIN.equals(comando)) {
+            procesarLogin(partes);
+            return;
+        }
 
+        // Todos los demás comandos requieren autenticación
+        if (!autenticado) {
+            logger.warning("Intento de comando sin autenticación de cliente #" + idCliente + ": " + comando);
+            enviarRespuesta(Protocolo.AUTH_ERROR, "Debe autenticarse primero con LOGIN");
+            return;
+        }
+
+        // Procesar comandos autenticados
+        switch (comando) {
             case Protocolo.MSG:
                 procesarMensaje(partes);
                 break;
@@ -132,13 +134,19 @@ public class ManejadorCliente implements Runnable {
                 procesarList();
                 break;
 
+            case Protocolo.KICK:
+                procesarKick(partes);
+                break;
+
+            case Protocolo.SHUTDOWN:
+                procesarShutdown();
+                break;
+
             case "/ping":
-                // Comando de slash directo
                 procesarPing();
                 break;
 
             case "/list":
-                // Comando de slash directo
                 procesarList();
                 break;
 
@@ -150,55 +158,70 @@ public class ManejadorCliente implements Runnable {
     }
 
     /**
-     * Procesa el comando LOGIN
-     * Formato: LOGIN|nombreUsuario
-     *
-     * @param partes Array del mensaje desempaquetado
+     * Procesa el comando LOGIN con autenticación
+     * Formato: LOGIN|nombreUsuario|password
+     * Valida las credenciales y bloquea tras 3 intentos fallidos
      */
     private void procesarLogin(String[] partes) {
-        if (partes.length < 2) {
-            logger.warning("LOGIN incompleto de cliente #" + idCliente);
-            enviarRespuesta(Protocolo.ERROR, "Formato LOGIN incorrecto");
+        // Ya autenticado - no permitir nuevo login
+        if (autenticado) {
+            logger.warning("Intento de re-login de usuario autenticado: " + nombreUsuario);
+            enviarRespuesta(Protocolo.ERROR, "Ya estás autenticado como " + nombreUsuario);
             return;
         }
 
-        String nuevoNombre = partes[1].trim();
+        if (partes.length < 3) {
+            logger.warning("LOGIN incompleto de cliente #" + idCliente);
+            enviarRespuesta(Protocolo.ERROR, "Formato LOGIN incorrecto. Usa: LOGIN|usuario|password");
+            return;
+        }
 
-        // Validar que el nombre no esté vacío
-        if (nuevoNombre.isEmpty()) {
-            logger.warning("Intento de login con nombre vacío del cliente #" + idCliente);
+        String usuario = partes[1].trim();
+        String password = partes[2];
+
+        if (usuario.isEmpty()) {
+            logger.warning("Intento de login con usuario vacío");
             enviarRespuesta(Protocolo.ERROR, "El nombre de usuario no puede estar vacío");
             return;
         }
 
-        // Registrar el usuario en el GestorUsuarios
-        // Si el nombre ya existe, el GestorUsuario desconectará la sesión anterior automáticamente
-        if (gestorUsuarios.registrarUsuario(nuevoNombre, salida)) {
-            this.nombreUsuario = nuevoNombre;
-            logger.info("Cliente #" + idCliente + " autenticado como: " + nombreUsuario);
-            // Mostrar notificación en la consola del servidor
+        // Validar credenciales (retorna el rol o null si falla)
+        String rol = gestorUsuarios.validarCredenciales(usuario, password);
+
+        if (Protocolo.USER_BLOCKED.equals(rol)) {
+            logger.warning("Usuario bloqueado por intentos fallidos: " + usuario);
+            enviarRespuesta(Protocolo.USER_BLOCKED, "Usuario bloqueado por demasiados intentos fallidos. Intenta en 30 segundos");
+            return;
+        }
+
+        if (rol == null) {
+            logger.warning("Login fallido para usuario: " + usuario);
+            enviarRespuesta(Protocolo.AUTH_ERROR, "Usuario o contraseña incorrectos");
+            return;
+        }
+
+        // Credenciales válidas - registrar usuario
+        if (gestorUsuarios.registrarUsuarioAutenticado(usuario, rol, salida)) {
+            this.nombreUsuario = usuario;
+            this.rolUsuario = rol;
+            this.autenticado = true;
+
+            logger.info("Cliente #" + idCliente + " autenticado como: " + nombreUsuario + " (Rol: " + rol + ")");
             System.out.println(gestorUsuarios.obtenerMensajeConexion(nombreUsuario));
-            enviarRespuesta(Protocolo.OK, "Login exitoso como " + nombreUsuario +
-                          ". Usuarios conectados: " + gestorUsuarios.obtenerCantidadUsuarios());
+
+            enviarRespuesta(Protocolo.OK, "Login exitoso. Bienvenido " + nombreUsuario +
+                          " (Rol: " + rol + "). Usuarios conectados: " + gestorUsuarios.obtenerCantidadUsuarios());
         } else {
-            logger.warning("Fallo al registrar usuario: " + nuevoNombre);
-            enviarRespuesta(Protocolo.ERROR, "Error al registrar el usuario");
+            logger.warning("Error al registrar usuario autenticado: " + usuario);
+            enviarRespuesta(Protocolo.ERROR, "Error al registrar el usuario en el servidor");
         }
     }
 
     /**
-     * Procesa un mensaje normal
+     * Procesa un mensaje de chat
      * Formato: MSG|contenido
-     *
-     * @param partes Array del mensaje desempaquetado
      */
     private void procesarMensaje(String[] partes) {
-        if (nombreUsuario == null) {
-            logger.warning("Intento de enviar mensaje sin login de cliente #" + idCliente);
-            enviarRespuesta(Protocolo.ERROR, "Debe hacer login primero");
-            return;
-        }
-
         if (partes.length < 2) {
             logger.warning("MSG incompleto de cliente #" + idCliente);
             enviarRespuesta(Protocolo.ERROR, "Formato MSG incorrecto");
@@ -208,7 +231,6 @@ public class ManejadorCliente implements Runnable {
         String contenido = partes[1];
         logger.info("Mensaje de " + nombreUsuario + " (#" + idCliente + "): " + contenido);
 
-        // Hacer broadcasting del mensaje a todos los usuarios
         int destinatarios = gestorUsuarios.broadcastingGlobal(nombreUsuario, contenido);
         logger.fine("Mensaje reenviado a " + destinatarios + " usuarios");
 
@@ -217,30 +239,16 @@ public class ManejadorCliente implements Runnable {
 
     /**
      * Procesa el comando PING
-     * Responde con PONG
      */
     private void procesarPing() {
-        if (nombreUsuario == null) {
-            logger.warning("PING sin login de cliente #" + idCliente);
-            enviarRespuesta(Protocolo.ERROR, "Debe hacer login primero");
-            return;
-        }
-
         logger.info("PING recibido de " + nombreUsuario + " (#" + idCliente + ")");
         enviarRespuesta("PONG", "Servidor activo");
     }
 
     /**
      * Procesa el comando LIST
-     * Retorna la lista de usuarios conectados
      */
     private void procesarList() {
-        if (nombreUsuario == null) {
-            logger.warning("LIST sin login de cliente #" + idCliente);
-            enviarRespuesta(Protocolo.ERROR, "Debe hacer login primero");
-            return;
-        }
-
         logger.info("LIST solicitado por " + nombreUsuario + " (#" + idCliente + ")");
 
         String listaUsuarios = gestorUsuarios.obtenerListaUsuarios();
@@ -250,28 +258,100 @@ public class ManejadorCliente implements Runnable {
     }
 
     /**
+     * Procesa el comando KICK (expulsión de usuario)
+     * Formato: KICK|nombreUsuarioAExpulsar
+     * SOLO permitido para usuarios con rol ADMIN
+     */
+    private void procesarKick(String[] partes) {
+        // Validar permisos de ADMIN
+        if (!gestorUsuarios.esAdmin(nombreUsuario)) {
+            logger.warning("Intento de KICK sin permisos de ADMIN: " + nombreUsuario);
+            enviarRespuesta(Protocolo.PERMISSION_DENIED, "Solo los ADMIN pueden usar /kick");
+            return;
+        }
+
+        if (partes.length < 2) {
+            logger.warning("KICK incompleto de cliente #" + idCliente);
+            enviarRespuesta(Protocolo.ERROR, "Formato KICK incorrecto. Usa: KICK|nick");
+            return;
+        }
+
+        String usuarioAExpulsar = partes[1].trim();
+
+        if (usuarioAExpulsar.isEmpty()) {
+            enviarRespuesta(Protocolo.ERROR, "El nombre de usuario a expulsar no puede estar vacío");
+            return;
+        }
+
+        // No permitir auto-expulsión
+        if (usuarioAExpulsar.equals(nombreUsuario)) {
+            logger.warning("Intento de auto-expulsión: " + nombreUsuario);
+            enviarRespuesta(Protocolo.ERROR, "No puedes expulsarte a ti mismo");
+            return;
+        }
+
+        // Ejecutar expulsión
+        if (gestorUsuarios.expulsarUsuario(usuarioAExpulsar)) {
+            logger.info("Usuario " + usuarioAExpulsar + " expulsado por " + nombreUsuario);
+            System.out.println("[ADMIN] " + nombreUsuario + " expulsó a " + usuarioAExpulsar);
+
+            // Notificar al ADMIN que ejecutó la expulsión
+            enviarRespuesta(Protocolo.OK, "Usuario " + usuarioAExpulsar + " ha sido expulsado");
+
+            // Notificar a todos los demás usuarios
+            gestorUsuarios.broadcasting(nombreUsuario, "El usuario " + usuarioAExpulsar + " fue expulsado del servidor", false);
+        } else {
+            logger.warning("Intento de expulsar usuario inexistente: " + usuarioAExpulsar);
+            enviarRespuesta(Protocolo.ERROR, "Usuario no encontrado: " + usuarioAExpulsar);
+        }
+    }
+
+    /**
+     * Procesa el comando SHUTDOWN (cierre del servidor)
+     * SOLO permitido para usuarios con rol ADMIN
+     */
+    private void procesarShutdown() {
+        // Validar permisos de ADMIN
+        if (!gestorUsuarios.esAdmin(nombreUsuario)) {
+            logger.warning("Intento de SHUTDOWN sin permisos de ADMIN: " + nombreUsuario);
+            enviarRespuesta(Protocolo.PERMISSION_DENIED, "Solo los ADMIN pueden usar /shutdown");
+            return;
+        }
+
+        logger.warning("SHUTDOWN iniciado por ADMIN: " + nombreUsuario);
+        System.out.println("[ADMIN] " + nombreUsuario + " ha iniciado el SHUTDOWN del servidor");
+
+        // Notificar a todos los usuarios sobre el cierre inminente
+        gestorUsuarios.broadcasting(nombreUsuario, "[SERVIDOR] El servidor se está cerrando", false);
+
+        enviarRespuesta(Protocolo.OK, "Iniciando cierre del servidor");
+
+        // Dar tiempo para que los mensajes se envíen
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            logger.warning("Interrupción durante espera de SHUTDOWN: " + e.getMessage());
+        }
+
+        // Solicitar cierre del servidor mediante System.exit
+        logger.severe("SHUTDOWN completado. Cerrando JVM");
+        System.exit(0);
+    }
+
+    /**
      * Procesa el comando BYE (desconexión)
      */
     private void procesarBye() {
-        if (nombreUsuario == null) {
-            logger.warning("BYE sin login de cliente #" + idCliente);
-        } else {
-            logger.info(nombreUsuario + " (#" + idCliente + ") solicita desconexión");
-            gestorUsuarios.desconectarUsuario(nombreUsuario);
-            // Mostrar estado actual de la lista de usuarios
-            System.out.println(gestorUsuarios.obtenerEstadoMonitoreo());
-        }
+        logger.info(nombreUsuario + " (#" + idCliente + ") solicita desconexión");
+        gestorUsuarios.desconectarUsuario(nombreUsuario);
+        System.out.println(gestorUsuarios.obtenerEstadoMonitoreo());
 
         enviarRespuesta(Protocolo.OK, "Desconexión confirmada");
         conectado = false;
     }
 
     /**
-     * Envía una respuesta al cliente directamente
-     * Formato: RESPUESTA|contenido
-     *
-     * @param respuesta Tipo de respuesta
-     * @param contenido Contenido de la respuesta
+     * Envía una respuesta al cliente
      */
     private void enviarRespuesta(String respuesta, String contenido) {
         String mensaje = Protocolo.empaquetar(respuesta, contenido);
@@ -279,7 +359,7 @@ public class ManejadorCliente implements Runnable {
         if (conectado && salida != null) {
             salida.println(mensaje);
             salida.flush();
-            logger.info("Respuesta enviada a cliente #" + idCliente + ": " + mensaje);
+            logger.info("Respuesta enviada a cliente #" + idCliente + ": " + respuesta);
         }
     }
 
@@ -290,38 +370,31 @@ public class ManejadorCliente implements Runnable {
         logger.info("Iniciando cierre de conexión para cliente #" + idCliente);
         conectado = false;
 
-        // Desconectar del gestor si estaba registrado
-        if (nombreUsuario != null) {
+        if (autenticado && nombreUsuario != null) {
             gestorUsuarios.desconectarUsuario(nombreUsuario);
-            // Mostrar notificación en la consola del servidor
             System.out.println(gestorUsuarios.obtenerMensajeDesconexion(nombreUsuario));
-            // Mostrar estado actual de la lista de usuarios (incluyendo cuando está vacía)
             System.out.println(gestorUsuarios.obtenerEstadoMonitoreo());
-            logger.info("Usuario " + nombreUsuario + " desconectado del gestor");
+            logger.info("Usuario " + nombreUsuario + " desconectado");
         }
 
         try {
-            if (entrada != null) {
-                entrada.close();
-            }
+            if (entrada != null) entrada.close();
         } catch (IOException e) {
-            logger.warning("Error al cerrar BufferedReader: " + e.getMessage());
+            logger.warning("Error al cerrar entrada: " + e.getMessage());
         }
 
         try {
-            if (salida != null) {
-                salida.close();
-            }
+            if (salida != null) salida.close();
         } catch (Exception e) {
-            logger.warning("Error al cerrar PrintWriter: " + e.getMessage());
+            logger.warning("Error al cerrar salida: " + e.getMessage());
         }
 
         if (socketCliente != null && !socketCliente.isClosed()) {
             try {
                 socketCliente.close();
-                logger.info("Conexión cerrada para cliente #" + idCliente);
+                logger.info("Socket cerrado para cliente #" + idCliente);
             } catch (IOException e) {
-                logger.warning("Error al cerrar socket del cliente #" + idCliente + ": " + e.getMessage());
+                logger.warning("Error al cerrar socket: " + e.getMessage());
             }
         }
 

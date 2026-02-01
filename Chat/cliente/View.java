@@ -1,11 +1,11 @@
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.awt.geom.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.geom.*;
 import java.util.logging.Logger;
 
 public class View extends JFrame {
@@ -24,27 +24,16 @@ public class View extends JFrame {
     private JPanel panelIzquierdo, panelDerecho;
     private JPanel panelBotonMenu, panelBotonFeedback; // Paneles flotantes para botones
     private JPanel areaFeedbackPanel; // Panel para mostrar mensajes de feedback
-    private JPanel panelPrincipal; // Panel principal para cambio de tema
-    private JButton btnSol; // Botón para cambiar tema
+    private JPanel panelPrincipal; // Panel principal
     private boolean menuVisible = false;
     private boolean feedbackVisible = false;
-    private boolean isDarkMode = false; // Estado del tema
     private Timer animacionTimer;
     private int anchoMenu = 140;
     private int anchoFeedback = 280;
     private int anchoActual = 0;
     private int anchoFeedbackActual = 0;
 
-    // Paleta de Colores para Modo Oscuro
-    private final Color DARK_BG = new Color(24, 24, 24);          // Fondo principal (menos puro)
-    private final Color DARK_ACCENT = new Color(33, 33, 33);      // Paneles secundarios
-    private final Color DARK_CHAT_BG = new Color(18, 18, 18);     // Área de chat (más profunda)
-    private final Color DARK_TEXT = new Color(225, 225, 225);     // Texto principal
-    private final Color DARK_TEXT_MUTED = new Color(150, 150, 150); // Texto secundario
-    private final Color DARK_BORDER = new Color(45, 45, 45);      // Bordes sutiles
-    private final Color DARK_BLUE_BUBBLE = new Color(10, 100, 200); // Azul más suave para el ojo
-
-    // Paleta de Colores para Modo Claro
+    // Paleta de colores base (claro/por defecto)
     private final Color LIGHT_BG = Color.WHITE;
     private final Color LIGHT_ACCENT = new Color(245, 245, 245);
     private final Color LIGHT_TEXT = Color.BLACK;
@@ -166,7 +155,7 @@ public class View extends JFrame {
                 BorderFactory.createEmptyBorder(10, 0, 10, 0)
         ));
 
-        // --- NUEVA CABECERA DEL MENÚ (Título + Sol) ---
+        // --- NUEVA CABECERA DEL MENÚ (Título) ---
         JPanel panelCabeceraMenu = new JPanel(new BorderLayout());
         panelCabeceraMenu.setOpaque(false);
         panelCabeceraMenu.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
@@ -176,21 +165,7 @@ public class View extends JFrame {
         lblTitulo.setFont(new Font("Arial", Font.BOLD, 12));
         lblTitulo.setForeground(new Color(200, 200, 200));
 
-        // Botón de Sol (Tema Claro)
-        btnSol = new JButton(createSunIcon(Color.ORANGE));
-        btnSol.setPreferredSize(new Dimension(25, 25));
-        btnSol.setContentAreaFilled(false);
-        btnSol.setBorderPainted(false);
-        btnSol.setFocusPainted(false);
-        btnSol.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        btnSol.setToolTipText("Cambiar a Tema Claro");
-
-        // Añadir acción para cambiar tema
-        btnSol.addActionListener(e -> toggleTheme());
-
-        // Añadir al panel de cabecera
         panelCabeceraMenu.add(lblTitulo, BorderLayout.WEST);
-        panelCabeceraMenu.add(btnSol, BorderLayout.EAST);
 
         // Añadir cabecera al menú principal
         panelMenu.add(panelCabeceraMenu);
@@ -570,253 +545,10 @@ public class View extends JFrame {
         areaChatPanel.repaint();
     }
 
-    /**
-     * Alterna entre tema claro y oscuro
-     */
-    private void toggleTheme() {
-        isDarkMode = !isDarkMode;
-        if (isDarkMode) {
-            applyDarkTheme();
-        } else {
-            applyLightTheme();
-        }
-    }
-
-    /**
-     * Aplica el tema claro a toda la aplicación
-     */
-    private void applyLightTheme() {
-        Color bgPrimary = LIGHT_BG;
-        Color bgSecondary = LIGHT_ACCENT;
-
-        // 1. Paneles Principales
-        panelPrincipal.setBackground(bgPrimary);
-        panelChat.setBackground(bgPrimary);
-        panelInfo.setBackground(bgPrimary);
-        panelEntrada.setBackground(bgPrimary);
-        panelBotones.setBackground(bgPrimary);
-
-        // 2. Paneles Laterales (Menu y Feedback)
-        panelIzquierdo.setBackground(new Color(45, 45, 48)); // El menú se mantiene oscuro por diseño
-        panelDerecho.setBackground(bgSecondary);
-        panelDerecho.setBorder(BorderFactory.createMatteBorder(0, 2, 0, 0, LIGHT_BORDER));
-        areaFeedbackPanel.setBackground(Color.WHITE);
-
-        // 3. Área de Chat y Scroll
-        areaChatPanel.setBackground(bgSecondary);
-        JScrollPane scrollChat = (JScrollPane) areaChatPanel.getParent().getParent();
-        if (scrollChat != null) {
-            scrollChat.getViewport().setBackground(bgSecondary);
-            scrollChat.getVerticalScrollBar().setBackground(bgPrimary);
-            scrollChat.getHorizontalScrollBar().setBackground(bgPrimary);
-        }
-
-        // 4. Componentes de Entrada
-        campoEntrada.setBackground(Color.WHITE);
-        campoEntrada.setForeground(LIGHT_TEXT);
-        campoEntrada.setCaretColor(LIGHT_TEXT);
-        campoEntrada.setBorder(BorderFactory.createLineBorder(LIGHT_BORDER));
-
-        // 5. Etiquetas
-        lblEstado.setForeground(Color.RED);
-        lblUsuario.setForeground(LIGHT_TEXT);
-        lblConectados.setForeground(LIGHT_TEXT);
-
-        // Cambiar icono a sol (tema claro)
-        btnSol.setIcon(createSunIcon(Color.ORANGE));
-        btnSol.setToolTipText("Cambiar a Tema Oscuro");
-
-        // Refrescar toda la interfaz
-        refreshUI();
-    }
-
-    /**
-     * Aplica el tema oscuro a toda la aplicación con soporte para bocadillos dinámicos
-     */
-    private void applyDarkTheme() {
-        // 1. Paneles Principales y Contenedores
-        panelPrincipal.setBackground(DARK_BG);
-        panelChat.setBackground(DARK_CHAT_BG);
-        panelInfo.setBackground(DARK_BG);
-        panelEntrada.setBackground(DARK_BG);
-        panelBotones.setBackground(DARK_BG);
-
-        // IMPORTANTE: Actualizar el fondo del panel que contiene los mensajes
-        areaChatPanel.setBackground(DARK_CHAT_BG);
-
-        // 2. Paneles Laterales
-        panelIzquierdo.setBackground(DARK_ACCENT);
-        panelMenu.setBackground(DARK_ACCENT);
-        panelDerecho.setBackground(DARK_ACCENT);
-        panelDerecho.setBorder(BorderFactory.createMatteBorder(0, 1, 0, 0, DARK_BORDER));
-        areaFeedbackPanel.setBackground(DARK_ACCENT);
-
-        // 3. ScrollBars - CRÍTICO para evitar parches blancos
-        JScrollPane scrollChat = (JScrollPane) areaChatPanel.getParent().getParent();
-        if (scrollChat != null) {
-            scrollChat.setBackground(DARK_CHAT_BG);
-            scrollChat.getViewport().setBackground(DARK_CHAT_BG);
-            scrollChat.setBorder(null);
-            scrollChat.getVerticalScrollBar().setBackground(DARK_ACCENT);
-            scrollChat.getHorizontalScrollBar().setBackground(DARK_ACCENT);
-        }
-
-        // 4. Componentes de Entrada
-        campoEntrada.setBackground(new Color(45, 45, 45));
-        campoEntrada.setForeground(DARK_TEXT);
-        campoEntrada.setCaretColor(Color.WHITE);
-        campoEntrada.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(DARK_BORDER),
-            BorderFactory.createEmptyBorder(8, 10, 8, 10)
-        ));
-
-        // 5. Etiquetas de estado
-        lblEstado.setForeground(new Color(129, 199, 132)); // Verde pastel
-        lblUsuario.setForeground(DARK_TEXT);
-        lblConectados.setForeground(DARK_TEXT_MUTED);
-
-        // CRÍTICO: Asegurar que las etiquetas no tengan fondos opacos
-        lblEstado.setOpaque(false);
-        lblUsuario.setOpaque(false);
-        lblConectados.setOpaque(false);
-
-        // 6. Actualizar todos los paneles hijos recursivamente para modo oscuro
-        updateComponentsInDarkTheme(this);
-
-        // 7. Actualizar Bocadillos y sus Contenedores - CRÍTICO para consistencia
-        for (Component c : areaChatPanel.getComponents()) {
-            if (c instanceof JPanel) {
-                c.setBackground(DARK_CHAT_BG); // Quita el fondo blanco del contenedor del mensaje
-                for (Component sub : ((JPanel) c).getComponents()) {
-                    if (sub instanceof BocadilloChat) {
-                        ((BocadilloChat) sub).actualizarTema(true);
-                    }
-                }
-            }
-        }
-
-        // 8. Actualizar Icono del botón de tema
-        btnSol.setIcon(createMoonIcon(new Color(241, 196, 15)));
-        btnSol.setToolTipText("Cambiar a Tema Claro");
-
-        // 9. Refrescar toda la interfaz
-        refreshUI();
-    }
-
-    /**
-     * Actualiza recursivamente todos los componentes para modo oscuro
-     */
-    private void updateComponentsInDarkTheme(Component component) {
-        if (component instanceof JPanel) {
-            JPanel panel = (JPanel) component;
-            // No cambiar panelMenu (que es oscuro por diseño)
-            if (panel != panelMenu && panel != panelIzquierdo && panel != panelDerecho) {
-                // Verificar si el panel tiene un fondo blanco o gris claro
-                if (panel.isOpaque() && (panel.getBackground().equals(Color.WHITE) ||
-                    panel.getBackground().equals(new Color(245, 245, 245)) ||
-                    panel.getBackground().equals(new Color(240, 240, 240)))) {
-                    panel.setBackground(DARK_BG);
-                }
-            }
-
-            // Recurrir en los componentes hijos
-            for (Component child : panel.getComponents()) {
-                updateComponentsInDarkTheme(child);
-            }
-        } else if (component instanceof JLabel) {
-            JLabel label = (JLabel) component;
-            label.setOpaque(false); // Las etiquetas no deben ser opacas
-        }
-    }
-
-    /**
-     * Actualiza y redibuja toda la interfaz de usuario
-     * Asegura que todos los componentes hijos se adapten al nuevo esquema de color
-     */
     private void refreshUI() {
         SwingUtilities.updateComponentTreeUI(this);
         panelPrincipal.revalidate();
         panelPrincipal.repaint();
-    }
-
-    /**
-     * Genera un icono de luna mediante dibujo vectorial (Graphics2D)
-     */
-    private Icon createMoonIcon(Color color) {
-        return new Icon() {
-            @Override
-            public void paintIcon(Component c, Graphics g, int x, int y) {
-                Graphics2D g2d = (Graphics2D) g.create();
-                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-                g2d.setColor(color);
-
-                // Dibujar luna creciente
-                Ellipse2D moon = new Ellipse2D.Double(x + 4, y + 2, 16, 20);
-                Ellipse2D shadow = new Ellipse2D.Double(x + 8, y + 2, 16, 20);
-
-                Area moonArea = new Area(moon);
-                moonArea.subtract(new Area(shadow));
-
-                g2d.fill(moonArea);
-
-                g2d.dispose();
-            }
-
-            @Override
-            public int getIconWidth() {
-                return 20;
-            }
-
-            @Override
-            public int getIconHeight() {
-                return 20;
-            }
-        };
-    }
-
-    /**
-     * Genera un icono de sol mediante dibujo vectorial (Graphics2D)
-     */
-    private Icon createSunIcon(Color color) {
-        return new Icon() {
-            @Override
-            public void paintIcon(Component c, Graphics g, int x, int y) {
-                Graphics2D g2d = (Graphics2D) g.create();
-                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-                int size = 20;
-                int cx = x + size / 2;
-                int cy = y + size / 2;
-                int radius = 5;
-
-                g2d.setColor(color);
-                g2d.setStroke(new BasicStroke(2, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-
-                // Rayos
-                for (int i = 0; i < 8; i++) {
-                    double angle = Math.PI * 2 * i / 8;
-                    int x1 = cx + (int) (Math.cos(angle) * (radius + 2));
-                    int y1 = cy + (int) (Math.sin(angle) * (radius + 2));
-                    int x2 = cx + (int) (Math.cos(angle) * (radius + 5));
-                    int y2 = cy + (int) (Math.sin(angle) * (radius + 5));
-                    g2d.drawLine(x1, y1, x2, y2);
-                }
-                // Centro
-                g2d.fillOval(cx - radius, cy - radius, radius * 2, radius * 2);
-                g2d.dispose();
-            }
-
-            @Override
-            public int getIconWidth() {
-                return 20;
-            }
-
-            @Override
-            public int getIconHeight() {
-                return 20;
-            }
-        };
     }
 
     // --- GETTERS DE BOTONES ---
@@ -852,6 +584,46 @@ public class View extends JFrame {
      */
     public String solicitarNombreUsuario() {
         return JOptionPane.showInputDialog(this, "Ingrese su nombre de usuario:", "");
+    }
+
+    /**
+     * Solicita usuario y contraseña para autenticación
+     * Retorna un array de 2 elementos: [usuario, password]
+     * o null si se cancela
+     */
+    public String[] solicitarCredenciales() {
+        JPanel panel = new JPanel(new GridLayout(2, 2, 10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        JLabel usuarioLabel = new JLabel("Usuario:");
+        JTextField usuarioField = new JTextField(15);
+        JLabel passwordLabel = new JLabel("Contraseña:");
+        JPasswordField passwordField = new JPasswordField(15);
+
+        panel.add(usuarioLabel);
+        panel.add(usuarioField);
+        panel.add(passwordLabel);
+        panel.add(passwordField);
+
+        int resultado = JOptionPane.showConfirmDialog(this, panel,
+                "Autenticación requerida",
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE);
+
+        if (resultado == JOptionPane.OK_OPTION) {
+            String usuario = usuarioField.getText();
+            String password = new String(passwordField.getPassword());
+
+            if (usuario.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "El usuario no puede estar vacío",
+                        "Error", JOptionPane.ERROR_MESSAGE);
+                return null;
+            }
+
+            return new String[]{usuario, password};
+        }
+
+        return null;
     }
 
     /**
@@ -1187,31 +959,11 @@ public class View extends JFrame {
 
         /**
          * Método para actualizar el tema de un bocadillo existente con soporte para modo oscuro
-         * @param esOscuro true para modo oscuro, false para modo claro
+         * (la versión simplificada mantiene colores por defecto; se eliminó la lógica de modo oscuro)
          */
         public void actualizarTema(boolean esOscuro) {
-            if (esOscuro) {
-                // Colores optimizados para modo oscuro (Material Design)
-                if (esDerecha) {
-                    this.colorFondo = new Color(10, 100, 200); // Azul más suave para el ojo
-                    this.colorTexto = Color.WHITE;
-                } else {
-                    this.colorFondo = new Color(50, 50, 50); // Gris oscuro más suave
-                    this.colorTexto = new Color(220, 220, 220); // Texto claro legible
-                }
-            } else {
-                // Colores para modo claro
-                if (esDerecha) {
-                    this.colorFondo = new Color(0, 132, 255); // Azul
-                    this.colorTexto = Color.WHITE;
-                } else {
-                    this.colorFondo = new Color(233, 233, 235); // Gris claro
-                    this.colorTexto = Color.BLACK;
-                }
-            }
-
-            labelMensaje.setForeground(colorTexto);
-            repaint();
+            // Ignorar el parámetro y aplicar colores por defecto (tema claro)
+            actualizarTema();
         }
     }
 }

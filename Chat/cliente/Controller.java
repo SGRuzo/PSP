@@ -80,27 +80,35 @@ public class Controller {
             return;
         }
 
-        // Solicitar nombre de usuario
-        nombreUsuario = vista.solicitarNombreUsuario();
-        if (nombreUsuario == null || nombreUsuario.trim().isEmpty()) {
+        // Solicitar nombre de usuario y contraseña
+        String[] credenciales = vista.solicitarCredenciales();
+        if (credenciales == null) {
+            logger.info("Conexión cancelada: credenciales no proporcionadas");
+            return;
+        }
+
+        String usuario = credenciales[0];
+        String password = credenciales[1];
+
+        if (usuario == null || usuario.trim().isEmpty()) {
             logger.info("Conexión cancelada: nombre de usuario vacío");
             return;
         }
 
         // Intentar conectar
-        conectarAlServidor(host, puerto, nombreUsuario);
+        conectarAlServidor(host, puerto, usuario, password);
     }
 
     /**
      * Conecta al servidor usando ClienteConExecutor con UN ÚNICO SOCKET
-     * IMPORTANTE: Se utiliza un único socket bidireccional para enviar y recibir mensajes
-     * Esto evita problemas de sincronización entre múltiples conexiones
+     * Envía LOGIN con usuario y contraseña (autenticación obligatoria)
      *
      * @param host Dirección del servidor
      * @param puerto Puerto del servidor
      * @param usuario Nombre de usuario para login
+     * @param password Contraseña para autenticación
      */
-    private void conectarAlServidor(String host, int puerto, String usuario) {
+    private void conectarAlServidor(String host, int puerto, String usuario, String password) {
         try {
             logger.info("Conectando a " + host + ":" + puerto);
 
@@ -109,22 +117,19 @@ public class Controller {
                 clienteExecutor = new ClienteConExecutor(this);
             }
 
-            // ✅ UN ÚNICO SOCKET creado aquí
+            // Conectar socket
             clienteExecutor.conectar(host, puerto);
-            logger.info("ClienteConExecutor conectado con UN socket");
+            logger.info("ClienteConExecutor conectado");
 
-            // ✅ ENVIAR LOGIN por EL MISMO SOCKET
-            clienteExecutor.enviarComando(Protocolo.LOGIN, usuario);
-            logger.info("Comando LOGIN enviado por el mismo socket");
+            // Enviar LOGIN con usuario y contraseña
+            clienteExecutor.enviarComando(Protocolo.LOGIN, usuario, password);
+            logger.info("Comando LOGIN enviado con autenticación");
 
-            // Actualizar UI
-            conectado = true;
+            // Actualizar UI (se confirmará cuando llegue respuesta OK)
             nombreUsuario = usuario;
-            vista.establecerEstado(true);
             vista.establecerUsuario(nombreUsuario);
-            vista.mostrarMensajeSistema("[SISTEMA] Conectado como " + nombreUsuario);
-            vista.mostrarMensajeSistema("Conectado a la sala de chat");
-            logger.info("Cliente conectado y escuchando por UN ÚNICO socket");
+            vista.mostrarMensajeSistema("[SISTEMA] Autenticando...");
+            logger.info("Esperando confirmación de autenticación");
 
         } catch (IOException e) {
             logger.severe("Error al conectar: " + e.getMessage());

@@ -1,5 +1,3 @@
-
-
 /**
  * Clase que define el protocolo de comunicación entre cliente y servidor.
  * Contiene constantes para los comandos y el separador de campos.
@@ -22,11 +20,20 @@ public class Protocolo {
     public static final String BYE = "BYE";
     public static final String LIST = "LIST";
     public static final String PING = "PING";
+    public static final String KICK = "KICK";
+    public static final String SHUTDOWN = "SHUTDOWN";
 
     // Respuestas del servidor
     public static final String OK = "OK";
     public static final String ERROR = "ERROR";
     public static final String SERVIDOR_DESCONECTADO = "SERVIDOR_DESCONECTADO";
+    public static final String AUTH_ERROR = "AUTH_ERROR";
+    public static final String PERMISSION_DENIED = "PERMISSION_DENIED";
+    public static final String USER_BLOCKED = "USER_BLOCKED";
+
+    // Roles de usuario
+    public static final String ROLE_USER = "USER";
+    public static final String ROLE_ADMIN = "ADMIN";
 
     /**
      * Escapa caracteres especiales en un parámetro para que no rompan el protocolo
