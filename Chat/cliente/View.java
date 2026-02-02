@@ -213,7 +213,7 @@ public class View extends JFrame {
         btnToggleMenu = new JButton("☰");
         btnToggleMenu.setPreferredSize(new Dimension(30, 30));
         btnToggleMenu.setFont(new Font("Arial", Font.BOLD, 16));
-        btnToggleMenu.setBackground(new Color(70, 130, 180));
+        btnToggleMenu.setBackground(new Color(107, 70, 180));
         btnToggleMenu.setForeground(Color.WHITE);
         btnToggleMenu.setFocusPainted(false);
         btnToggleMenu.setBorderPainted(false);
@@ -225,12 +225,12 @@ public class View extends JFrame {
         btnToggleMenu.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseEntered(MouseEvent e) {
-                btnToggleMenu.setBackground(new Color(90, 150, 200));
+                btnToggleMenu.setBackground(new Color(107, 70, 180));
             }
 
             @Override
             public void mouseExited(MouseEvent e) {
-                btnToggleMenu.setBackground(new Color(70, 130, 180));
+                btnToggleMenu.setBackground(new Color(107, 70, 180));
             }
         });
 
@@ -260,7 +260,7 @@ public class View extends JFrame {
         btnToggleFeedback = new JButton("◀");
         btnToggleFeedback.setPreferredSize(new Dimension(25, 25));
         btnToggleFeedback.setFont(new Font("Arial", Font.BOLD, 16));
-        btnToggleFeedback.setBackground(new Color(70, 130, 180));
+        btnToggleFeedback.setBackground(new Color(107, 70, 180));
         btnToggleFeedback.setForeground(Color.WHITE);
         btnToggleFeedback.setFocusPainted(false);
         btnToggleFeedback.setBorderPainted(false);
@@ -272,12 +272,12 @@ public class View extends JFrame {
         btnToggleFeedback.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseEntered(MouseEvent e) {
-                btnToggleFeedback.setBackground(new Color(90, 150, 200));
+                btnToggleFeedback.setBackground(new Color(107, 70, 180));
             }
 
             @Override
             public void mouseExited(MouseEvent e) {
-                btnToggleFeedback.setBackground(new Color(70, 130, 180));
+                btnToggleFeedback.setBackground(new Color(107, 70, 180));
             }
         });
 
@@ -353,7 +353,7 @@ public class View extends JFrame {
         JButton btnToggleFeedbackFlotante = new JButton("◀");
         btnToggleFeedbackFlotante.setPreferredSize(new Dimension(30, 30));
         btnToggleFeedbackFlotante.setFont(new Font("Arial", Font.BOLD, 16));
-        btnToggleFeedbackFlotante.setBackground(new Color(70, 130, 180));
+        btnToggleFeedbackFlotante.setBackground(new Color(107, 70, 180));
         btnToggleFeedbackFlotante.setForeground(Color.WHITE);
         btnToggleFeedbackFlotante.setFocusPainted(false);
         btnToggleFeedbackFlotante.setBorderPainted(false);
@@ -365,12 +365,12 @@ public class View extends JFrame {
         btnToggleFeedbackFlotante.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseEntered(MouseEvent e) {
-                btnToggleFeedbackFlotante.setBackground(new Color(90, 150, 200));
+                btnToggleFeedbackFlotante.setBackground(new Color(107, 70, 180));
             }
 
             @Override
             public void mouseExited(MouseEvent e) {
-                btnToggleFeedbackFlotante.setBackground(new Color(70, 130, 180));
+                btnToggleFeedbackFlotante.setBackground(new Color(107, 70, 180));
             }
         });
 

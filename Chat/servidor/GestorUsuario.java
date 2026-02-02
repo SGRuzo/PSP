@@ -1,5 +1,4 @@
 import java.io.PrintWriter;
-import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
@@ -395,6 +394,66 @@ public class GestorUsuario {
      */
     public String obtenerMensajeDesconexion(String nombreUsuario) {
         return "[SERVIDOR] " + nombreUsuario + " se ha desconectado";
+    }
+
+    /**
+     * Notifica a todos los usuarios que el servidor se está cerrando.
+     */
+    public void notificarCierreServidor() {
+        String contenido = "El servidor se está cerrando";
+        String mensaje = Protocolo.empaquetar("NOTIFICACION", contenido);
+
+        Map<String, UsuarioAutenticado> snapshot;
+        synchronized (usuariosConectados) {
+            snapshot = new java.util.HashMap<>(usuariosConectados);
+        }
+
+        for (Map.Entry<String, UsuarioAutenticado> entrada : snapshot.entrySet()) {
+            String usuario = entrada.getKey();
+            UsuarioAutenticado usuarioObj = entrada.getValue();
+
+            Object lock = locksUsuarios.get(usuario);
+            if (lock != null && usuarioObj.salida != null) {
+                synchronized (lock) {
+                    try {
+                        if (!usuarioObj.salida.checkError()) {
+                            usuarioObj.salida.println(mensaje);
+                            usuarioObj.salida.flush();
+                        }
+                    } catch (Exception e) {
+                        logger.warning("Error notificando cierre de servidor a " + usuario + ": " + e.getMessage());
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Desconecta y limpia todos los usuarios conectados. Cierra salidas y mapas internos.
+     */
+    public void desconectarTodos() {
+        Map<String, UsuarioAutenticado> snapshot;
+        synchronized (usuariosConectados) {
+            snapshot = new java.util.HashMap<>(usuariosConectados);
+        }
+
+        for (Map.Entry<String, UsuarioAutenticado> entrada : snapshot.entrySet()) {
+            String nombre = entrada.getKey();
+            UsuarioAutenticado usuario = usuariosConectados.remove(nombre);
+            locksUsuarios.remove(nombre);
+            if (usuario != null && usuario.salida != null) {
+                try {
+                    usuario.salida.close();
+                } catch (Exception e) {
+                    logger.warning("Error cerrando salida para usuario " + nombre + ": " + e.getMessage());
+                }
+            }
+        }
+
+        // Asegurar que las estructuras estén vacías
+        usuariosConectados.clear();
+        locksUsuarios.clear();
+        logger.info("Todos los usuarios han sido desconectados y las estructuras limpias.");
     }
 
     /**
