@@ -62,11 +62,7 @@ public class Controller {
     private void accionConectar() {
         logger.info("Acción: Conectar");
 
-        // Usar valores predefinidos para host y puerto
-        String host = "localhost";
-        int puerto = 5000;
-
-        // Solicitar email y contraseña en una única ventana
+        // Solicitar email, contraseña, host y puerto en una única ventana
         String[] credenciales = vista.solicitarCredencialesUnificadas();
         if (credenciales == null) {
             logger.info("Conexión cancelada: credenciales no proporcionadas");
@@ -75,9 +71,20 @@ public class Controller {
 
         String usuario = credenciales[0];
         String password = credenciales[1];
+        String host = credenciales[2];
+        String puertoStr = credenciales[3];
 
         if (usuario == null || usuario.trim().isEmpty()) {
             logger.info("Conexión cancelada: nombre de usuario vacío");
+            return;
+        }
+
+        int puerto;
+        try {
+            puerto = Integer.parseInt(puertoStr);
+        } catch (NumberFormatException e) {
+            logger.severe("Puerto inválido: " + puertoStr);
+            vista.mostrarError("Error", "El puerto debe ser un número válido");
             return;
         }
 

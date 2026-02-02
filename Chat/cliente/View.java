@@ -627,9 +627,9 @@ public class View extends JFrame {
     }
 
     /**
-     * Solicita credenciales unificadas (email, contraseña, localhost y puerto predefinido)
+     * Solicita credenciales unificadas (email, contraseña, host y puerto)
      * en una única ventana.
-     * Retorna un array de 2 elementos: [email, password]
+     * Retorna un array de 4 elementos: [email, password, host, puerto]
      * o null si se cancela
      */
     public String[] solicitarCredencialesUnificadas() {
@@ -642,10 +642,10 @@ public class View extends JFrame {
         JPasswordField passwordField = new JPasswordField(15);
         JLabel hostLabel = new JLabel("Host:");
         JTextField hostField = new JTextField("localhost", 15);
-        hostField.setEnabled(false);
+        hostField.setEnabled(true);
         JLabel puertoLabel = new JLabel("Puerto:");
         JTextField puertoField = new JTextField("5000", 15);
-        puertoField.setEnabled(false);
+        puertoField.setEnabled(true);
 
         panel.add(emailLabel);
         panel.add(emailField);
@@ -664,6 +664,8 @@ public class View extends JFrame {
         if (resultado == JOptionPane.OK_OPTION) {
             String email = emailField.getText();
             String password = new String(passwordField.getPassword());
+            String host = hostField.getText();
+            String puerto = puertoField.getText();
 
             if (email.isEmpty()) {
                 JOptionPane.showMessageDialog(this, "El email no puede estar vacío",
@@ -677,7 +679,28 @@ public class View extends JFrame {
                 return solicitarCredencialesUnificadas();
             }
 
-            return new String[]{email, password};
+            if (host.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "El host no puede estar vacío",
+                        "Error", JOptionPane.ERROR_MESSAGE);
+                return solicitarCredencialesUnificadas();
+            }
+
+            if (puerto.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "El puerto no puede estar vacío",
+                        "Error", JOptionPane.ERROR_MESSAGE);
+                return solicitarCredencialesUnificadas();
+            }
+
+            // Validar que el puerto sea un número válido
+            try {
+                Integer.parseInt(puerto);
+            } catch (NumberFormatException e) {
+                JOptionPane.showMessageDialog(this, "El puerto debe ser un número válido",
+                        "Error", JOptionPane.ERROR_MESSAGE);
+                return solicitarCredencialesUnificadas();
+            }
+
+            return new String[]{email, password, host, puerto};
         }
 
         return null;
