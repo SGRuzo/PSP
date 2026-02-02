@@ -62,26 +62,12 @@ public class Controller {
     private void accionConectar() {
         logger.info("Acción: Conectar");
 
-        // Solicitar datos del servidor
-        String[] datosServidor = vista.solicitarDatosServidor();
-        if (datosServidor == null) {
-            logger.info("Conexión cancelada por el usuario");
-            return;
-        }
+        // Usar valores predefinidos para host y puerto
+        String host = "localhost";
+        int puerto = 5000;
 
-        String host = datosServidor[0];
-        int puerto;
-
-        try {
-            puerto = Integer.parseInt(datosServidor[1]);
-        } catch (NumberFormatException e) {
-            vista.mostrarError("Error", "Puerto inválido");
-            logger.warning("Puerto inválido: " + datosServidor[1]);
-            return;
-        }
-
-        // Solicitar nombre de usuario y contraseña
-        String[] credenciales = vista.solicitarCredenciales();
+        // Solicitar email y contraseña en una única ventana
+        String[] credenciales = vista.solicitarCredencialesUnificadas();
         if (credenciales == null) {
             logger.info("Conexión cancelada: credenciales no proporcionadas");
             return;
@@ -94,6 +80,8 @@ public class Controller {
             logger.info("Conexión cancelada: nombre de usuario vacío");
             return;
         }
+
+        logger.info("Conectando a " + host + ":" + puerto + " con usuario: " + usuario);
 
         // Intentar conectar
         conectarAlServidor(host, puerto, usuario, password);

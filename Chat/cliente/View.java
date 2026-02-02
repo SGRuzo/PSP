@@ -627,6 +627,63 @@ public class View extends JFrame {
     }
 
     /**
+     * Solicita credenciales unificadas (email, contraseña, localhost y puerto predefinido)
+     * en una única ventana.
+     * Retorna un array de 2 elementos: [email, password]
+     * o null si se cancela
+     */
+    public String[] solicitarCredencialesUnificadas() {
+        JPanel panel = new JPanel(new GridLayout(4, 2, 10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+
+        JLabel emailLabel = new JLabel("Gmail:");
+        JTextField emailField = new JTextField(15);
+        JLabel passwordLabel = new JLabel("Contraseña:");
+        JPasswordField passwordField = new JPasswordField(15);
+        JLabel hostLabel = new JLabel("Host:");
+        JTextField hostField = new JTextField("localhost", 15);
+        hostField.setEnabled(false);
+        JLabel puertoLabel = new JLabel("Puerto:");
+        JTextField puertoField = new JTextField("5000", 15);
+        puertoField.setEnabled(false);
+
+        panel.add(emailLabel);
+        panel.add(emailField);
+        panel.add(passwordLabel);
+        panel.add(passwordField);
+        panel.add(hostLabel);
+        panel.add(hostField);
+        panel.add(puertoLabel);
+        panel.add(puertoField);
+
+        int resultado = JOptionPane.showConfirmDialog(this, panel,
+                "Registro - Chat Unificado",
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE);
+
+        if (resultado == JOptionPane.OK_OPTION) {
+            String email = emailField.getText();
+            String password = new String(passwordField.getPassword());
+
+            if (email.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "El email no puede estar vacío",
+                        "Error", JOptionPane.ERROR_MESSAGE);
+                return solicitarCredencialesUnificadas();
+            }
+
+            if (password.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "La contraseña no puede estar vacía",
+                        "Error", JOptionPane.ERROR_MESSAGE);
+                return solicitarCredencialesUnificadas();
+            }
+
+            return new String[]{email, password};
+        }
+
+        return null;
+    }
+
+    /**
      * Muestra un diálogo de error
      * @param titulo Título del diálogo
      * @param mensaje Mensaje de error
